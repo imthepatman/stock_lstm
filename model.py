@@ -2,15 +2,17 @@
 
 import numpy as np
 from numpy import newaxis
-from keras.layers import Dense, Activation, Dropout, LSTM,GRU
-from keras.models import Sequential, load_model
-from keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
+from tensorflow.keras.layers import Dense, Activation, Dropout, LSTM,GRU
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
 import matplotlib.pyplot as plt
-from keras import optimizers
+from tensorflow.keras import optimizers
 import os
 import math
+import time
 
-class lstm:
+
+class Model:
     """A class for an building and inferencing an lstm model"""
 
     def build(self, configs):
@@ -62,14 +64,15 @@ class lstm:
         )
 
     def train_generator(self, epochs, batch_size, steps_per_epoch, shuffle=True, early_stopping_patience=1000):
-        print('[Model] Training Started')
-        print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
 
         batch_generator = self.generate_sequential_batch
 
         early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
         learning_rate_scheduler_callback = LearningRateScheduler(self.step_decay_lr)
 
+        print('[Model] Training Started')
+        print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
+        time_start = time.time()
         self.model.fit_generator(
             batch_generator(batch_size,shuffle),
             steps_per_epoch=steps_per_epoch,
@@ -78,7 +81,7 @@ class lstm:
             callbacks=[early_stopping_callback]
         )
 
-        print('[Model] Training Completed')
+        print('[Model] Training completed in ' + '{0:.1f}'.format(time.time()-time_start) + "s")
 
     def step_decay_lr(self,epoch,current_lr):
         initial_lr = 0.1
@@ -143,20 +146,25 @@ class lstm:
             curr_frame = np.insert(curr_frame, [window_size - 2], predicted[-1], axis=0)
         return predicted
 
-    def evaluate_prediction_sign(self,x,y,evaluation_length,window_size,normalize,prediction_length):
+    def evaluate_prediction(self, x, y, evaluation_length, window_size, normalize, prediction_length):
         reference_data = y[-evaluation_length-prediction_length:].flatten()
-        right_prediction_counter = np.zeros(prediction_length)
+        prediction_sign_counter = np.zeros(prediction_length)
+        prediction_error = np.zeros(prediction_length)
         for pos in range(evaluation_length):
             if(pos % 10 == 0):
                 print("evaluating prediction sign at position "+str(pos))
-            data_initial = x[-pos-1]
+            data_initial = x[-pos-prediction_length-1]
             prediction = self.predict_sequence(data_initial, window_size,normalize,prediction_length)
             prediction = np.array(prediction).flatten()
-            d_ref = np.array([reference_data[pos+i] - reference_data[pos-1] for i in range(prediction_length)])
-            d_pred = np.array([prediction[i] - reference_data[pos-1] for i in range(prediction_length)])
+            d_ref = np.array([reference_data[-pos-prediction_length+i] - reference_data[-pos-prediction_length-1] for i in range(prediction_length)])
+            d_pred = np.array([prediction[i] - reference_data[-pos-prediction_length-1] for i in range(prediction_length)])
+            ratio = np.array([prediction[i]/reference_data[-pos-prediction_length+i] for i in range(prediction_length)])
+            #ratio = d_pred/d_ref
 
-            right_prediction_counter += np.where(np.multiply(d_ref,d_pred)>=0,1,0)
-        return(right_prediction_counter/evaluation_length)
+            prediction_sign_counter += np.where(np.multiply(d_ref,d_pred)>=0,1,0)
+            prediction_error +=np.abs(1-ratio)
+
+        return(prediction_sign_counter/evaluation_length,prediction_error/evaluation_length)
 
 
     '''***************************************DATA OPERATIONS*****************************************************'''
@@ -203,7 +211,7 @@ class lstm:
         data_length = np.shape(self.data_x)[0]
         window_size = np.shape(self.data_x)[1]
         indices = np.arange(data_length)
-        print("data x shape ",np.shape(self.data_x))
+        #print("data x shape ",np.shape(self.data_x))
         if shuffle: np.random.shuffle(indices)
         i = 0
         while i < data_length:
@@ -249,39 +257,15 @@ class lstm:
         y = window[-1, [0]]
         return x, y
 
-    def test(self,x):
-        print("test ",x)
-
     '''***************************************SAVE / LOAD*****************************************************'''
 
     def save(self, name):
         abs_dir = os.path.dirname(os.path.realpath(__file__))
         self.model.save(abs_dir+"/models/rnn_" + name)
-        print("model " + name + " saved")
+        print("[Model] " + name + " saved")
 
     def load(self, name):
         abs_dir = os.path.dirname(os.path.realpath(__file__))
         self.model = load_model(abs_dir+"/models/rnn_" + name)
-        print("model " + name + " loaded")
+        print("[Model] " + name + " loaded")
 
-'''***************************************PLOTTING*****************************************************'''
-
-def plot_results(predicted_data, true_data):
-    fig = plt.figure(facecolor='white')
-    ax = fig.add_subplot(111)
-    ax.plot(true_data, label='True Data')
-    plt.plot(predicted_data, label='Prediction')
-    plt.legend()
-    plt.show()
-
-
-def plot_results_multiple(predicted_data, true_data, prediction_len):
-    fig = plt.figure(facecolor='white')
-    ax = fig.add_subplot(111)
-    ax.plot(true_data, label='True Data')
-	# Pad the list of predictions to shift it in the graph to it's correct start
-    for i, data in enumerate(predicted_data):
-        padding = [None for p in range(i * prediction_len)]
-        plt.plot(padding + data, label='Prediction')
-        plt.legend()
-    plt.show()

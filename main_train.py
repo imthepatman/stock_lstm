@@ -13,14 +13,13 @@ if(len(sys.argv)==5) :
     epochs = int(sys.argv[3])
     resume = sys.argv[4]
 
-    data_columns = ['4. close','1. open', '5. volume']
-    window_size = 31
-    interval_min = 0
+    data_columns = ['4. close','1. open','5. volume']
+    window_size = 61
+    interval_min = -3*365
     interval_max = None
     normalize = True
 
     batch_size = 32
-    steps_per_epoch = 100
     shuffle = True
 
     test_model = False
@@ -59,11 +58,21 @@ if(len(sys.argv)==5) :
         data_columns = ["4a. close (USD)", "1a. open (USD)", "5. volume"]
 
     elif (stock_name== "MixedTech"):
-        symbols = ["GOOG","AMZN","MSFT"]
+        symbols = ["AMZN","TSLA","AAPL","GOOG","MSFT"]
         datasets = []
+        ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
         for s in symbols:
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
             dataset, meta_data = ts.get_daily(symbol=s, outputsize='full')
+            dataset.isna().any()
+            datasets.append(dataset)
+
+    elif (stock_name== "MixedCrypto"):
+        symbols = ["BTC","ETH"]
+        datasets = []
+        cc = CryptoCurrencies(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
+        data_columns = ["4a. close (USD)", "1a. open (USD)", "5. volume"]
+        for s in symbols:
+            dataset, meta_data = cc.get_digital_currency_daily(symbol=s, market='USD')
             dataset.isna().any()
             datasets.append(dataset)
     else:
@@ -77,7 +86,7 @@ if(len(sys.argv)==5) :
     abs_dir = os.path.dirname(os.path.realpath(__file__))
 
     config = json.load(open(abs_dir+'/model_config.json', 'r'))
-    model = lstm()
+    model = Model()
 
     data_x, datay = model.init_window_data(data_train,window_size,normalize)
 

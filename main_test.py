@@ -16,8 +16,8 @@ matplotlib.rcParams['font.sans-serif']
 
 
 stock_names = ["Amazon","Google","Microsoft","Tesla","Bitcoin"]
-#stock_names = ["Amazon"]
-model_names = ["MixedTech_60"]*len(stock_names)
+stock_names = ["AAL"]
+model_names = ["MixedTech_60_14"]*len(stock_names)
 view_lengths = [60]*len(stock_names)
 eval_perfs = [True]*len(stock_names)
 
@@ -34,9 +34,8 @@ for num in range(len(stock_names)):
         batch_size = 32
         normalize = True
         window_size = 61
-        #sequence_length = 60
         data_columns = ['4. close','1. open', '5. volume']
-        #data_columns = ['4. close', '5. volume']
+        #data_columns = ['4. close']
         interval_min = 0
         interval_max = None
         show = False
@@ -91,15 +90,15 @@ for num in range(len(stock_names)):
         data_dates = [d.date() for d in data_dates]
 
 
-        model = lstm()
+        model = Model()
         model.load(model_name)
 
         x, y = model.init_window_data(data_test, window_size, False)
         real_stock_price = np.concatenate(y)
 
-        relative_prediction_positions = [i * 7 for i in range(1,4)]  # [0,5,10,15,20,30,35,40]
-        prediction_lengths = [30] + [7 for r in range(len(relative_prediction_positions))]
-        relative_prediction_positions = [0] + relative_prediction_positions
+        relative_prediction_positions = [i * 7 for i in range(0,4)]  # [0,5,10,15,20,30,35,40]
+        prediction_lengths = [7 for r in range(len(relative_prediction_positions))]+[30]
+        relative_prediction_positions = relative_prediction_positions+[0]
 
 
         fig = plt.figure(figsize=(16,7))
@@ -115,18 +114,17 @@ for num in range(len(stock_names)):
         ax2.plot(data_dates[-view_length_2:], real_stock_price[-view_length_2:],'-', label ='bisheriger Preisverlauf',color=color_styles[0])
 
         #2 week plot
-        pos = 0
-        prediction_length = 7
-        predicted_stock_price = model.predict_sequence(x[-pos-1], window_size, normalize, prediction_length)
-        predicted_stock_price.insert(0, y[-pos - 1][0])
-        prediction_dates = [data_dates[-pos - 1]]
-        for j in range(1, prediction_length + 1):
-            prediction_dates.append(prediction_dates[j - 1] + dt.timedelta(days=1))
-        ax1.plot(prediction_dates, predicted_stock_price, '--',
-                 label=str(prediction_length) + '-Tage Vorhersage von heute',color=color_styles[1],zorder=5)
-        ax2.plot(prediction_dates, predicted_stock_price, '--',
-                 label=str(prediction_length) + '-Tage Vorhersage von heute', color=color_styles[1],zorder=5)
-
+        for p in range(2):
+            pos = p
+            prediction_length = 7
+            predicted_stock_price = model.predict_sequence(x[-pos-1], window_size, normalize, prediction_length)
+            predicted_stock_price.insert(0, y[-pos - 1][0])
+            prediction_dates = [data_dates[-pos - 1]]
+            for j in range(1, prediction_length + 1):
+                prediction_dates.append(prediction_dates[j - 1] + dt.timedelta(days=1))
+            ax1.plot(prediction_dates, predicted_stock_price, '--',
+                     label=str(prediction_length) + '-Tage Vorhersage vor '+str(pos)+' Tagen',color=color_styles[1+p],zorder=5)
+        zorder=5
         for i in range(len(relative_prediction_positions)):
             pos = relative_prediction_positions[i]
             prediction_length = prediction_lengths[i]
@@ -149,8 +147,9 @@ for num in range(len(stock_names)):
 
             #print(real_stock_price[-1],predicted_stock_price)
 
-            ax2.plot(prediction_dates, predicted_stock_price, '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(pos) + " Tagen",color = color_styles[2+i],zorder=0)
-
+            ax2.plot(prediction_dates, predicted_stock_price,
+                     '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(pos) + " Tagen",color = color_styles[1+i],zorder=zorder)
+            zorder =0
             # Visualising the results
         fig.suptitle(stock_name, fontweight='bold',y=1.05,fontsize=20)
         ax1.set_title("letzte 2 Wochen")
@@ -165,16 +164,20 @@ for num in range(len(stock_names)):
         props = dict(boxstyle='round,pad=1', facecolor=color_styles[0],edgecolor=color_styles[0], alpha=0.5)
 
         if evaluate_performance:
-            prediction_sign_rates = model.evaluate_prediction_sign(x, y, 100, window_size,normalize, 7)
+            prediction_sign_rates,prediction_errors = model.evaluate_prediction(x, y, 100, window_size, normalize, 7)
             print("prediction sign rate ",prediction_sign_rates)
+            print("prediction errors ",prediction_errors)
 
-            infotext = "Vorhersage Infos: \n"
-            for i in range(len(prediction_sign_rates)):
-                infotext += "$r_" + str(i + 1) + "=" + '{0:.0f}'.format(prediction_sign_rates[i] * 100.) + "\%$"
+            prediction_range = np.arange(7)
+            errorinfo = "Abweichung: \n"
+
+            for i in prediction_range:
+                errorinfo += r"$\delta_" + str(i + 1) + "=" + \
+                             '{0:.1f}'.format(prediction_errors[i] * 100.) + "\%$"
                 if (i < len(prediction_sign_rates) - 1):
-                    infotext += "\n"
+                    errorinfo += "\n"
 
-            ax2.text(1.05, 0.75, infotext, transform=ax2.transAxes, fontsize=10,
+            ax2.text(1.05, 0.8, errorinfo, transform=ax2.transAxes, fontsize=10,
                      verticalalignment='top', bbox=props)
 
         timestamp = dt.datetime.now().strftime("%d.%m.%Y / %H:%M:%S")
@@ -200,6 +203,8 @@ for num in range(len(stock_names)):
         #plt.gcf().autofmt_xdate()
         plt.setp(plt.xticks()[1], rotation=30, ha='right')
         fig.tight_layout()
+        ax1.grid(True,ls='--',lw=.5,c='k',alpha=.3)
+        ax2.grid(True,ls='--',lw=.5,c='k',alpha=.3)
 
         abs_dir = os.path.dirname(os.path.realpath(__file__))
         plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight')
