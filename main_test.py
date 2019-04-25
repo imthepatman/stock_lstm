@@ -143,7 +143,7 @@ for num in range(len(stock_names)):
         props = dict(boxstyle='round,pad=1', facecolor=color_styles[0],edgecolor=color_styles[0], alpha=0.5)
 
         if evaluate_performance:
-            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates,x, y, 60, window_size, normalize, 7)
+            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates,x, y, 100, window_size, normalize, 7)
             print("prediction sign rate ",prediction_sign_rates)
             print("prediction mean ",prediction_mean)
             print("prediction errors ", prediction_error)
@@ -170,10 +170,15 @@ for num in range(len(stock_names)):
                      verticalalignment='top', bbox=props)
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error),main_prediction[1]*(1+3*prediction_error),color=color_styles[1], alpha=.1)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error),main_prediction[1]*(1+2*prediction_error),color=color_styles[1], alpha=.2)
             ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
-            ax2.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
-
-
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error),
+                             main_prediction[1] * (1 + 3 * prediction_error), color=color_styles[1], alpha=.1)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error),
+                             main_prediction[1] * (1 + 2 * prediction_error), color=color_styles[1], alpha=.2)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error),
+                             main_prediction[1] * (1 + prediction_error), color=color_styles[1], alpha=.3)
 
         ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
