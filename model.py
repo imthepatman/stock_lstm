@@ -2,11 +2,10 @@
 
 import numpy as np
 from numpy import newaxis
-from tensorflow.keras.layers import Dense, Activation, Dropout, LSTM,GRU
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
-import matplotlib.pyplot as plt
-from tensorflow.keras import optimizers
+from keras.layers import Dense, Activation, Dropout, LSTM,GRU
+from keras.models import Sequential, load_model
+from keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
+from keras import optimizers
 import os
 import math
 import time
@@ -14,6 +13,10 @@ import time
 
 class Model:
     """A class for an building and inferencing an lstm model"""
+    def __init__(self,name):
+        self.name = name
+        self.abs_dir = os.path.dirname(os.path.realpath(__file__))
+
 
     def build(self, configs):
         self.model = Sequential()
@@ -69,6 +72,8 @@ class Model:
 
         early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
         learning_rate_scheduler_callback = LearningRateScheduler(self.step_decay_lr)
+        checkpoint = ModelCheckpoint(self.abs_dir+"/models/cp_"+self.name, monitor='loss', verbose=1, save_best_only=True, mode='min')
+        callbacks_list = [checkpoint,early_stopping_callback]
 
         print('[Model] Training Started')
         print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
@@ -78,7 +83,7 @@ class Model:
             steps_per_epoch=steps_per_epoch,
             epochs=epochs,
             workers=1,
-            callbacks=[early_stopping_callback]
+            callbacks=callbacks_list
         )
 
         print('[Model] Training completed in ' + '{0:.1f}'.format(time.time()-time_start) + "s")
@@ -146,25 +151,54 @@ class Model:
             curr_frame = np.insert(curr_frame, [window_size - 2], predicted[-1], axis=0)
         return predicted
 
-    def evaluate_prediction(self, x, y, evaluation_length, window_size, normalize, prediction_length):
+    def evaluate_prediction(self, dates,x, y, evaluation_length, window_size, normalize, prediction_length):
         reference_data = y[-evaluation_length-prediction_length:].flatten()
+        reference_dates = dates[-evaluation_length-prediction_length:]
         prediction_sign_counter = np.zeros(prediction_length)
-        prediction_error = np.zeros(prediction_length)
+        prediction_rates = np.zeros(prediction_length)
+        prediction_rates_sq = np.zeros(prediction_length)
+        p_counter = np.zeros(prediction_length)
         for pos in range(evaluation_length):
             if(pos % 10 == 0):
-                print("evaluating prediction sign at position "+str(pos))
-            data_initial = x[-pos-prediction_length-1]
+                print("evaluating prediction at position "+str(pos))
+
+            index = -pos-prediction_length-1
+
+            date = reference_dates[index]
+            data_initial = x[index]
+
             prediction = self.predict_sequence(data_initial, window_size,normalize,prediction_length)
             prediction = np.array(prediction).flatten()
-            d_ref = np.array([reference_data[-pos-prediction_length+i] - reference_data[-pos-prediction_length-1] for i in range(prediction_length)])
-            d_pred = np.array([prediction[i] - reference_data[-pos-prediction_length-1] for i in range(prediction_length)])
-            ratio = np.array([prediction[i]/reference_data[-pos-prediction_length+i] for i in range(prediction_length)])
-            #ratio = d_pred/d_ref
+            d_ref = np.zeros(prediction_length)
+            d_pred = np.zeros(prediction_length)
+            d_ratio = np.zeros(prediction_length)
+            ones = np.zeros(prediction_length)
 
-            prediction_sign_counter += np.where(np.multiply(d_ref,d_pred)>=0,1,0)
-            prediction_error +=np.abs(1-ratio)
 
-        return(prediction_sign_counter/evaluation_length,prediction_error/evaluation_length)
+            delta_days = np.array([(reference_dates[index + p + 1]- date).days for p in range(prediction_length)])
+            #print("delta days",delta_days)
+            for p in range(prediction_length):
+                ds = np.where(delta_days==p+1)[0]
+                #print(ds)
+                if(len(ds)>0):
+                    d = ds[0]
+                    d_ref[p] = reference_data[index+d] - reference_data[index]
+                    d_pred[p] = prediction[p] - reference_data[index]
+                    d_ratio[p] = prediction[p]/reference_data[index+d]
+                    ones[p] = 1
+                    p_counter[p]+=1
+
+            prediction_sign_counter += np.where(np.multiply(d_ref,d_pred)>0,1,0)
+            prediction_rates += d_ratio-ones
+            prediction_rates_sq += np.power(d_ratio-ones,2)
+
+        prediction_sign_mean = prediction_sign_counter/p_counter
+        prediction_mean = prediction_rates/p_counter
+        prediction_mean_sq = prediction_rates_sq/p_counter
+        #print(prediction_mean,prediction_mean_sq,p_counter)
+        prediction_error = np.sqrt((prediction_mean_sq - np.power(prediction_mean,2)*(1-1/p_counter))/p_counter)
+        #print(prediction_mean,prediction_error)
+        return(prediction_sign_mean,prediction_mean,prediction_error)
 
 
     '''***************************************DATA OPERATIONS*****************************************************'''
@@ -259,13 +293,11 @@ class Model:
 
     '''***************************************SAVE / LOAD*****************************************************'''
 
-    def save(self, name):
-        abs_dir = os.path.dirname(os.path.realpath(__file__))
-        self.model.save(abs_dir+"/models/rnn_" + name)
-        print("[Model] " + name + " saved")
+    def save(self):
+        self.model.save(self.abs_dir+"/models/rnn_" + self.name)
+        print("[Model] " + self.name + " saved")
 
-    def load(self, name):
-        abs_dir = os.path.dirname(os.path.realpath(__file__))
-        self.model = load_model(abs_dir+"/models/rnn_" + name)
-        print("[Model] " + name + " loaded")
+    def load(self):
+        self.model = load_model(self.abs_dir+"/models/rnn_" + self.name)
+        print("[Model] " + self.name + " loaded")
 

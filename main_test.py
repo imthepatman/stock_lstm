@@ -1,23 +1,24 @@
 import matplotlib
 matplotlib.use('Agg')
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 from model import *
+import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pandas.plotting import register_matplotlib_converters
-from alpha_vantage.timeseries import TimeSeries
-from alpha_vantage.cryptocurrencies import CryptoCurrencies
 register_matplotlib_converters()
 import datetime as dt
-import sys
+from data_ops import *
 import os
-matplotlib.rcParams['font.sans-serif']
+import json
+#plt.rcParams["font.family"] = "monospace"
+matplotlib.rc('font',**{'family':'monospace'})
+matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 
 stock_names = ["Amazon","Google","Microsoft","Tesla","Bitcoin"]
-stock_names = ["AAL"]
-model_names = ["MixedTech_60_14"]*len(stock_names)
+#stock_names = ["GE","VWAGY","BMWYY","F"]
+#stock_names=["Amazon"]
+model_names = ["Mixed_2_5"]*len(stock_names)
 view_lengths = [60]*len(stock_names)
 eval_perfs = [True]*len(stock_names)
 
@@ -31,54 +32,23 @@ for num in range(len(stock_names)):
         evaluate_performance = eval_perfs[num]
 
 
-        batch_size = 32
         normalize = True
         window_size = 61
-        data_columns = ['4. close','1. open', '5. volume']
         #data_columns = ['4. close']
         interval_min = 0
         interval_max = None
         show = False
 
         color_styles = ['#1f77b4','#2ca02c','#ff7f0e','#d62728','#9467bd','#8c564b','#bcbd22']
-
-        if (stock_name == "Amazon"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='AMZN', outputsize='full')
-            dataset.isna().any()
-            datasets = [dataset]
-        elif (stock_name == "Google"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='GOOG', outputsize='full')
-            datasets = [dataset]
-        elif (stock_name == "Apple"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='AAPL', outputsize='full')
-            datasets = [dataset]
-        elif (stock_name == "Microsoft"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='MSFT', outputsize='full')
-            datasets = [dataset]
-        elif (stock_name == "AAL"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='AAL', outputsize='full')
-            dataset.isna().any()
-            datasets = [dataset]
-        elif (stock_name == "Tesla"):
-            ts = TimeSeries(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = ts.get_daily(symbol='TSLA', outputsize='full')
-            datasets = [dataset]
-        elif (stock_name == "Bitcoin"):
-            cc = CryptoCurrencies(key='PJNUY6BXU7LQI3P1', output_format='pandas', indexing_type='date')
-            dataset, meta_data = cc.get_digital_currency_daily(symbol='BTC', market='USD')
-            dataset.isna().any()
-            datasets = [dataset]
-            data_columns = ["4a. close (USD)", "1a. open (USD)", "5. volume"]
-        else:
-            print("Stock not available")
-            quit()
-
+        datasets = get_datasets(stock_name)
         print(datasets[0].tail())
+
+        abs_dir = os.path.dirname(os.path.realpath(__file__))
+        config = json.load(open(abs_dir + '/model_config.json', 'r'))
+
+        data_columns = config["data_columns"]
+        #data_columns = ["Close","Open","High","Low","Volume"]
+        #data_columns = ["Close","Open","Volume"]
 
         data_test = [pd.DataFrame(datasets[0]).get(data_columns).values[interval_min:interval_max]]
 
@@ -90,29 +60,27 @@ for num in range(len(stock_names)):
         data_dates = [d.date() for d in data_dates]
 
 
-        model = Model()
-        model.load(model_name)
+        model = Model(model_name)
+        model.load()
 
         x, y = model.init_window_data(data_test, window_size, False)
         real_stock_price = np.concatenate(y)
-
-        relative_prediction_positions = [i * 7 for i in range(0,4)]  # [0,5,10,15,20,30,35,40]
-        prediction_lengths = [7 for r in range(len(relative_prediction_positions))]+[30]
-        relative_prediction_positions = relative_prediction_positions+[0]
 
 
         fig = plt.figure(figsize=(16,7))
 
 
-        ax1 = plt.subplot2grid((3, 7), (0, 0), colspan=3, rowspan=3)
-        ax2 = plt.subplot2grid((3, 7), (0, 3), colspan=3, rowspan=3)
+        ax1 = plt.subplot2grid((3, 6), (0, 0), colspan=3, rowspan=3)
+        ax2 = plt.subplot2grid((3, 6), (0, 3), colspan=3, rowspan=3)
 
-        ax1.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute", color=color_styles[1], zorder=10)
-        ax2.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute", color=color_styles[1], zorder=10)
+        today_date = data_dates[-1].strftime("%d.%m.%Y")
+        ax1.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_styles[1], zorder=10)
+        ax2.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_styles[1], zorder=10)
 
         ax1.plot(data_dates[-view_length_1:], real_stock_price[-view_length_1:],'-', label ='bisheriger Preisverlauf',color=color_styles[0])
         ax2.plot(data_dates[-view_length_2:], real_stock_price[-view_length_2:],'-', label ='bisheriger Preisverlauf',color=color_styles[0])
 
+        main_prediction = []
         #2 week plot
         for p in range(2):
             pos = p
@@ -122,9 +90,19 @@ for num in range(len(stock_names)):
             prediction_dates = [data_dates[-pos - 1]]
             for j in range(1, prediction_length + 1):
                 prediction_dates.append(prediction_dates[j - 1] + dt.timedelta(days=1))
+            delta_days = (data_dates[- 1] - data_dates[-pos - 1]).days
+
+            #for later error tube
+            if(p==0):
+                main_prediction = [prediction_dates,np.array(predicted_stock_price)]
             ax1.plot(prediction_dates, predicted_stock_price, '--',
-                     label=str(prediction_length) + '-Tage Vorhersage vor '+str(pos)+' Tagen',color=color_styles[1+p],zorder=5)
+                     label=str(prediction_length) + '-Tage Vorhersage vor '+str(delta_days)+' Tagen',color=color_styles[1+p],zorder=5)
         zorder=5
+
+        relative_prediction_positions = [i * 7 for i in range(0, 4)]  # [0,5,10,15,20,30,35,40]
+        prediction_lengths = [7 for r in range(len(relative_prediction_positions))] + [30]
+        relative_prediction_positions = relative_prediction_positions + [0]
+
         for i in range(len(relative_prediction_positions)):
             pos = relative_prediction_positions[i]
             prediction_length = prediction_lengths[i]
@@ -147,13 +125,14 @@ for num in range(len(stock_names)):
 
             #print(real_stock_price[-1],predicted_stock_price)
 
+            delta_days = (data_dates[-1] - data_dates[-pos - 1]).days
             ax2.plot(prediction_dates, predicted_stock_price,
-                     '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(pos) + " Tagen",color = color_styles[1+i],zorder=zorder)
+                     '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(delta_days) + " Tagen",color = color_styles[1+i],zorder=zorder)
             zorder =0
             # Visualising the results
         fig.suptitle(stock_name, fontweight='bold',y=1.05,fontsize=20)
-        ax1.set_title("letzte 2 Wochen")
-        ax2.set_title("letzte " + str(view_length_2) + " Tage")
+        ax1.set_title("letzte 2 Wochen",fontsize=14)
+        ax2.set_title("letzte " + str(view_length_2) + " Tage",fontsize=14)
         ax1.set_xlabel('Datum')
         ax2.set_xlabel('Datum')
         ax1.set_ylabel('Preis / USD')
@@ -164,27 +143,43 @@ for num in range(len(stock_names)):
         props = dict(boxstyle='round,pad=1', facecolor=color_styles[0],edgecolor=color_styles[0], alpha=0.5)
 
         if evaluate_performance:
-            prediction_sign_rates,prediction_errors = model.evaluate_prediction(x, y, 100, window_size, normalize, 7)
+            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates,x, y, 60, window_size, normalize, 7)
             print("prediction sign rate ",prediction_sign_rates)
-            print("prediction errors ",prediction_errors)
+            print("prediction mean ",prediction_mean)
+            print("prediction errors ", prediction_error)
 
             prediction_range = np.arange(7)
-            errorinfo = "Abweichung: \n"
+            errorinfo = "Vorhersage Info: \n"
+
+            #col_labels = ["Tage", "Trend", r"$\pm$",r"$\updownarrow$"]
+            #row_labels = [str(i+1) for i in prediction_range]
+            #plt.rc('text', usetex=True)
+            #table = r"\begin{tabular}{ c | c | c | c } "+ col_labels[0] + r" & " + col_labels[1] + r" & " + col_labels[2] + r" & " + col_labels[3] + r" \\\hline "
 
             for i in prediction_range:
-                errorinfo += r"$\delta_" + str(i + 1) + "=" + \
-                             '{0:.1f}'.format(prediction_errors[i] * 100.) + "\%$"
+                #table+= row_labels[i] + " & {0:.1f}".format(prediction_mean[i] * 100.)+ " & {0:.1f}".format(prediction_error[i] * 100.)+ " & {0:.1f}".format(prediction_sign_rates[i] * 100.)
+                errorinfo += r"$\delta_" + str(i + 1) + "=" + "{0:.1f}".format(prediction_mean[i] * 100.) + \
+                            r"\pm" + "{0:.1f}".format(prediction_error[i] * 100.) + "\% \sim " + "{0:.1f}".format(prediction_sign_rates[i]* 100.) + "\%$"
                 if (i < len(prediction_sign_rates) - 1):
+                    #table+=r" \\\hline "
                     errorinfo += "\n"
 
-            ax2.text(1.05, 0.8, errorinfo, transform=ax2.transAxes, fontsize=10,
+            #table += r" \end{tabular}"
+            #table = r'''\begin{tabular}{ c | c | c | c } & col1 & col2 & col3 \\\hline row1 & 11 & 12 & 13 \\\hline row2 & 21 & 22 & 23 \\\hline  row3 & 31 & 32 & 33 \end{tabular}'''
+            ax2.text(1.05, 0.45, errorinfo, transform=ax2.transAxes, fontsize=12,
                      verticalalignment='top', bbox=props)
+            #plt.rc('text', usetex=False)
+            prediction_error = np.insert(prediction_error,0,0)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
+            ax2.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
+
+
+
+        ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
+                verticalalignment='top', bbox=props)
 
         timestamp = dt.datetime.now().strftime("%d.%m.%Y / %H:%M:%S")
-        ax2.text(1.05, 0.35, "Letzte Aktualisierung:\n" + timestamp, transform=ax2.transAxes, fontsize=10,
-                 verticalalignment='top', bbox=props)
-
-        ax2.text(1.05, 0.15, "Modell:\n" + model_name, transform=ax2.transAxes, fontsize=10,
+        ax2.text(1.05, -0.05, "Letzte Aktualisierung:\n" + timestamp, transform=ax2.transAxes, fontsize=10,
                  verticalalignment='top', bbox=props)
 
         ax1.spines['top'].set_visible(False)
@@ -196,18 +191,32 @@ for num in range(len(stock_names)):
         ax1.spines['left'].set_visible(False)
         ax2.spines['left'].set_visible(False)
 
+        ax1.margins(0)
+        ax2.margins(0)
+        ax1.set_ylim(ax1.get_ylim()[0], ax1.get_ylim()[1] * 1.02)
+        ax2.set_ylim(ax2.get_ylim()[0], ax2.get_ylim()[1] * 1.02)
+
         ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m.%Y'))
         ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m.%Y'))
         ax1.xaxis.set_major_locator(mdates.DayLocator(interval=int(view_length_2 / 7)))
+        ax1.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
         ax2.xaxis.set_major_locator(mdates.DayLocator(interval=int(view_length_2 / 7)))
+        ax2.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
         #plt.gcf().autofmt_xdate()
         plt.setp(plt.xticks()[1], rotation=30, ha='right')
         fig.tight_layout()
-        ax1.grid(True,ls='--',lw=.5,c='k',alpha=.3)
-        ax2.grid(True,ls='--',lw=.5,c='k',alpha=.3)
+        ax1.grid(True,'major',ls='--',lw=.8,c='black',alpha=.3)
+        ax1.grid(True,'minor',ls=':',lw=.5,c='k',alpha=.3)
+        ax2.grid(True,'major',ls='--',lw=.8,c='black',alpha=.3)
+        ax2.grid(True,'minor',ls=':',lw=.5,c='k',alpha=.3)
 
-        abs_dir = os.path.dirname(os.path.realpath(__file__))
-        plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight')
+        ax1.fill_between(data_dates[-view_length_1:], ax1.get_ylim()[0], real_stock_price[-view_length_1:],
+                         color=color_styles[0], alpha=.3)
+        ax2.fill_between(data_dates[-view_length_2:], ax2.get_ylim()[0], real_stock_price[-view_length_2:],
+                         color=color_styles[0], alpha=.3)
+
+
+        plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight',dpi=200)
         if(show):
             plt.show()
         else:
