@@ -49,7 +49,7 @@ def get_datasets(stock_name):
 
     elif (stock_name== "Mixed"):
         symbols = ["GE","VWAGY","BMWYY","F"]
-        symbols = ["TSLA","AMD","AMZN","MSFT"]
+        symbols = ["TSLA","AMD"]
         datasets = []
         for s in symbols:
             ticker = yf.Ticker(s)

@@ -12,7 +12,7 @@ if(len(sys.argv)==5) :
     resume = sys.argv[4]
     window_size = 61
     interval_min = -5*365
-    interval_max = None
+    interval_max = -200
     normalize = True
 
     batch_size = 64

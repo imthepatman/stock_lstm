@@ -170,15 +170,16 @@ for num in range(len(stock_names)):
                      verticalalignment='top', bbox=props)
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error),main_prediction[1]*(1+3*prediction_error),color=color_styles[1], alpha=.1)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error),main_prediction[1]*(1+2*prediction_error),color=color_styles[1], alpha=.2)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error),
-                             main_prediction[1] * (1 + 3 * prediction_error), color=color_styles[1], alpha=.1)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error),
-                             main_prediction[1] * (1 + 2 * prediction_error), color=color_styles[1], alpha=.2)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error),
-                             main_prediction[1] * (1 + prediction_error), color=color_styles[1], alpha=.3)
+            prediction_mean = np.insert(prediction_mean,0,0)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error-prediction_mean),main_prediction[1]*(1+3*prediction_error-prediction_mean),color=color_styles[1], alpha=.1)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error-prediction_mean),main_prediction[1]*(1+2*prediction_error-prediction_mean),color=color_styles[1], alpha=.2)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error-prediction_mean),main_prediction[1]*(1+prediction_error-prediction_mean),color=color_styles[1], alpha=.3)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error-prediction_mean),
+                             main_prediction[1] * (1 + 3 * prediction_error-prediction_mean), color=color_styles[1], alpha=.1)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error-prediction_mean),
+                             main_prediction[1] * (1 + 2 * prediction_error-prediction_mean), color=color_styles[1], alpha=.2)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error-prediction_mean),
+                             main_prediction[1] * (1 + prediction_error-prediction_mean), color=color_styles[1], alpha=.3)
 
         ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)

@@ -181,10 +181,11 @@ class Model:
                 ds = np.where(delta_days==p+1)[0]
                 #print(ds)
                 if(len(ds)>0):
+                    #d is index of delta_days where it's equal to p+1, thus p+1 days from index means d+1 in dates
                     d = ds[0]
-                    d_ref[p] = reference_data[index+d] - reference_data[index]
+                    d_ref[p] = reference_data[index+d+1] - reference_data[index]
                     d_pred[p] = prediction[p] - reference_data[index]
-                    d_ratio[p] = prediction[p]/reference_data[index+d]
+                    d_ratio[p] = prediction[p]/reference_data[index+d+1]
                     ones[p] = 1
                     p_counter[p]+=1
 
