@@ -6,28 +6,15 @@
 		"layers": [
 			{
 				"type": "lstm",
-				"neurons": 128,
-				"input_timesteps": 60,
-				"input_dim": 2,
-				"return_seq": true
-			},
+				"neurons": 64,
+				"return_seq": false,
+				"dropout_rate": 0.2,
+                "input_timesteps": 60,
+                "input_dim": 2
+            },
 			{
 				"type": "dropout",
-				"rate": 0.1
-			},
-			{
-				"type": "lstm",
-				"neurons": 128,
-				"return_seq": true
-			},
-			{
-				"type": "dropout",
-				"rate": 0.1
-			},
-			{
-				"type": "lstm",
-				"neurons": 128,
-				"return_seq": false
+				"dropout_rate": 0.2
 			},
 			{
 				"type": "dense",

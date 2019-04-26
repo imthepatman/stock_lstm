@@ -23,7 +23,7 @@ class Model:
 
         for layer in configs['model']['layers']:
             neurons = layer['neurons'] if 'neurons' in layer else None
-            dropout_rate = layer['rate'] if 'rate' in layer else None
+            dropout_rate = layer['dropout_rate'] if 'dropout_rate' in layer else None
             activation = layer['activation'] if 'activation' in layer else None
             return_seq = layer['return_seq'] if 'return_seq' in layer else None
             input_timesteps = layer['input_timesteps'] if 'input_timesteps' in layer else None
@@ -32,9 +32,9 @@ class Model:
             if layer['type'] == 'dense':
                 self.model.add(Dense(neurons, activation=activation))
             if layer['type'] == 'lstm':
-                self.model.add(LSTM(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq))
+                self.model.add(LSTM(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,recurrent_dropout=dropout_rate))
             if layer['type'] == 'gru':
-                self.model.add(GRU(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq))
+                self.model.add(GRU(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,recurrent_dropout=dropout_rate))
             if layer['type'] == 'dropout':
                 self.model.add(Dropout(rate = dropout_rate))
 

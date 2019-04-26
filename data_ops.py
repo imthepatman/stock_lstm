@@ -37,6 +37,16 @@ def get_datasets(stock_name):
         dataset.isna().any()
         return [dataset]
 
+    elif (stock_name== "Aut"):
+        symbols = ["VOE.VI"]
+        datasets = []
+        for s in symbols:
+            ticker = yf.Ticker(s)
+            dataset = ticker.history(period='max')
+            dataset.isna().any()
+            datasets.append(dataset)
+        return datasets
+
     elif (stock_name== "MixedTech"):
         symbols = ["AMZN","TSLA","AAPL","GOOG","MSFT"]
         datasets = []

@@ -11,8 +11,8 @@ if(len(sys.argv)==5) :
     epochs = int(sys.argv[3])
     resume = sys.argv[4]
     window_size = 61
-    interval_min = -5*365
-    interval_max = -200
+    interval_min = 0#-10*365
+    interval_max = -100
     normalize = True
 
     batch_size = 64
