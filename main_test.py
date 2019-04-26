@@ -16,9 +16,9 @@ matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 
 stock_names = ["Amazon","Google","Microsoft","Tesla","Bitcoin"]
-#stock_names = ["GE","VWAGY","BMWYY","F"]
+stock_names = ["GE","VWAGY","BMWYY","F"]
 #stock_names=["Amazon"]
-model_names = ["MixedTech_3"]*len(stock_names)
+model_names = ["Mixed_3"]*len(stock_names)
 view_lengths = [60]*len(stock_names)
 eval_perfs = [True]*len(stock_names)
 

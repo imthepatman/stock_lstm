@@ -1,5 +1,5 @@
 {
-	"data_columns": ["Close","Open"],
+	"data_columns": ["Close","Open","Volume"],
 	"model": {
 		"loss": "mse",
 		"optimizer": "adam",
@@ -10,7 +10,7 @@
 				"return_seq": false,
 				"dropout_rate": 0.2,
                 "input_timesteps": 60,
-                "input_dim": 2
+                "input_dim": 3
             },
 			{
 				"type": "dropout",
