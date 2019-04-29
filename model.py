@@ -41,7 +41,7 @@ class Model:
         if configs['model']['optimizer']=='adam':
             optimizer = optimizers.Adam()
         elif configs['model']['optimizer']=='nadam':
-            optimizer = optimizers.Nadam(lr=0.001)
+            optimizer = optimizers.Nadam()
         elif configs['model']['optimizer'] == 'nesterov':
             optimizer = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
         elif configs['model']['optimizer'] == 'rmsprop':
@@ -72,7 +72,7 @@ class Model:
 
         early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
         learning_rate_scheduler_callback = LearningRateScheduler(self.step_decay_lr)
-        checkpoint = ModelCheckpoint(self.abs_dir+"/models/cp_"+self.name, monitor='loss', verbose=1, save_best_only=True, mode='min')
+        checkpoint = ModelCheckpoint(self.abs_dir+"/models/rnn_"+self.name+"_cp", monitor='loss', verbose=1, save_best_only=True, mode='min')
         callbacks_list = [checkpoint,early_stopping_callback]
 
         print('[Model] Training Started')
@@ -124,7 +124,7 @@ class Model:
         x_data, y_data = self.init_window_data(data, window_size, False)
         print('[Model] Predicting Sequences Multiple...')
         prediction_seqs = []
-        for i in range(int(np.shape(data)[1] / prediction_len)):
+        for i in range(int(np.shape(data)[1] / prediction_len)-1):
             curr_frame = x_data[i * prediction_len]
             prediction = []
             for j in range(prediction_len):
@@ -301,4 +301,3 @@ class Model:
     def load(self):
         self.model = load_model(self.abs_dir+"/models/rnn_" + self.name)
         print("[Model] " + self.name + " loaded")
-

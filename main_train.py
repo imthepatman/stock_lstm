@@ -12,13 +12,13 @@ if(len(sys.argv)==5) :
     resume = sys.argv[4]
     window_size = 61
     interval_min = -10*365
-    interval_max = -100
+    interval_max = None
     normalize = True
 
     batch_size = 64
     shuffle = True
 
-    test_model = False
+    test_model = True
 
     abs_dir = os.path.dirname(os.path.realpath(__file__))
     config = json.load(open(abs_dir+'/model_config.json', 'r'))
@@ -30,7 +30,7 @@ if(len(sys.argv)==5) :
     data_columns = config["data_columns"]
 
     data_train  = [pd.DataFrame(ds).get(data_columns).values[interval_min:interval_max] for ds in datasets]
-    #data_train = [np.reshape(np.abs(np.sin(4*np.linspace(-10,10,10000)))+1,(-1,1))]
+    #data_train = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
     model = Model(model_name)
 
     data_x, datay = model.init_window_data(data_train,window_size,normalize)
@@ -55,8 +55,8 @@ if(len(sys.argv)==5) :
     model.save()
 
     if(test_model):
-        data_test = [pd.DataFrame(datasets[0]).get(data_columns).values[-1000:None]]
-        data_test = data_train
+        #data_test = [pd.DataFrame(datasets[0]).get(data_columns).values[-1000:None]]
+        data_test = data_train[-100:]
 
         x_test,y_test = model.init_window_data(data_test, window_size, False)
 
