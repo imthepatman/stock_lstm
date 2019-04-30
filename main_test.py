@@ -15,10 +15,11 @@ matplotlib.rc('font',**{'family':'monospace'})
 matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 
-stock_names = ["Amazon","Google","Microsoft","Tesla","Bitcoin"]
-#stock_names = ["GE","VWAGY","BMWYY","F"]
-stock_names=["ORA"]
-model_names = ["MixedTech_4"]*len(stock_names)
+stock_names=["Infineon","Aixtron","Gaia","SunOpta"]#
+#model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
+model_names = ["portfolio_2_256-256_5y"]*len(stock_names)
+
+#model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)
 eval_perfs = [True]*len(stock_names)
 
@@ -40,17 +41,19 @@ for num in range(len(stock_names)):
         show = False
 
         color_styles = ['#1f77b4','#2ca02c','#ff7f0e','#d62728','#9467bd','#8c564b','#bcbd22']
-        datasets = get_datasets(stock_name)
-        print(datasets[0].tail())
 
         abs_dir = os.path.dirname(os.path.realpath(__file__))
         config = json.load(open(abs_dir + '/model_config.json', 'r'))
-
         data_columns = config["data_columns"]
-        #data_columns = ["Close","Open","High","Low","Volume"]
-        #data_columns = ["Close","Open","Volume"]
+        # data_columns = ["Close","Open","High","Low","Volume"]
+        # data_columns = ["Close","Open","Volume"]
 
-        data_test = [pd.DataFrame(datasets[0]).get(data_columns).values[interval_min:interval_max]]
+        datasets = get_datasets(stock_name,data_columns)
+        print(datasets[0].tail())
+
+
+
+        data_test = [pd.DataFrame(datasets[0]).values[interval_min:interval_max]]
 
         dataframe = pd.DataFrame(datasets[0])
 
@@ -135,8 +138,8 @@ for num in range(len(stock_names)):
         ax2.set_title("letzte " + str(view_length_2) + " Tage",fontsize=14)
         ax1.set_xlabel('Datum')
         ax2.set_xlabel('Datum')
-        ax1.set_ylabel('Preis / USD')
-        ax2.set_ylabel('Preis / USD')
+        ax1.set_ylabel('Preis')
+        ax2.set_ylabel('Preis')
         ax1.legend(loc=0)
         ax2.legend(loc=0)
 
@@ -166,7 +169,7 @@ for num in range(len(stock_names)):
 
             #table += r" \end{tabular}"
             #table = r'''\begin{tabular}{ c | c | c | c } & col1 & col2 & col3 \\\hline row1 & 11 & 12 & 13 \\\hline row2 & 21 & 22 & 23 \\\hline  row3 & 31 & 32 & 33 \end{tabular}'''
-            ax2.text(1.05, 0.45, errorinfo, transform=ax2.transAxes, fontsize=12,
+            ax2.text(1.05, 0.5, errorinfo, transform=ax2.transAxes, fontsize=12,
                      verticalalignment='top', bbox=props)
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
@@ -222,7 +225,7 @@ for num in range(len(stock_names)):
                          color=color_styles[0], alpha=.3)
 
 
-        plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight',dpi=200)
+        plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight',dpi=100)
         if(show):
             plt.show()
         else:

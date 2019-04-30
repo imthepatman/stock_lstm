@@ -1,40 +1,35 @@
 {
-	"data_columns": ["Close"],
+	"data_columns": ["Close","Volume"],
 	"model": {
 		"loss": "mse",
 		"optimizer": "adam",
 		"layers": [
 			{
 				"type": "lstm",
-				"neurons": 200,
+				"neurons": 256,
 				"return_seq": true,
-				"dropout_rate": 0,
+				"dropout_rate": 0.05,
                 "input_timesteps": 60,
-                "input_dim": 1
+                "input_dim": 2
             },
 			{
 				"type": "dropout",
-				"dropout_rate": 0
+				"dropout_rate": 0.05
 			},
 			{
 				"type": "lstm",
-				"neurons": 200,
-				"return_seq": true,
-				"dropout_rate": 0
-            },
-			{
-				"type": "dropout",
-				"dropout_rate": 0
-			},
-			{
-				"type": "lstm",
-				"neurons": 100,
+				"neurons": 256,
 				"return_seq": false,
-				"dropout_rate": 0
+				"dropout_rate": 0.05
             },
 			{
 				"type": "dropout",
-				"dropout_rate": 0
+				"dropout_rate": 0.05
+			},
+			{
+				"type": "dense",
+				"neurons": 16,
+				"activation": "relu"
 			},
 			{
 				"type": "dense",

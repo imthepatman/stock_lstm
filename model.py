@@ -6,6 +6,7 @@ from keras.layers import Dense, Activation, Dropout, LSTM,GRU
 from keras.models import Sequential, load_model
 from keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
 from keras import optimizers
+import keras.backend as K
 import os
 import math
 import time
@@ -52,6 +53,8 @@ class Model:
         self.model.compile(loss=configs['model']['loss'], optimizer=optimizer)
 
         print('[Model] Model Compiled')
+
+
 
     '''***************************************TRAINING*****************************************************'''
     def train(self, data,sequence_length, normalize, epochs, batch_size,validation_split):
@@ -111,12 +114,14 @@ class Model:
         curr_frame = data_initial
         prediction = []
         for i in range(prediction_len):
+            #print("frame ",i,curr_frame)
             curr_frame_norm = self.normalize_windows(curr_frame, normalize)
             predicted = self.model.predict(curr_frame_norm)
             prediction.append(self.inverse_transform_prediction([curr_frame], predicted)[0])
 
             curr_frame = curr_frame[1:]
-            curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
+            #curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
+            curr_frame = np.insert(curr_frame, [window_size - 2], [prediction[-1],curr_frame[-1][1]], axis=0)
         return prediction
 
     def predict_sequences_multiple(self, data,window_size, normalize, prediction_len):

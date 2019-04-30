@@ -1,101 +1,92 @@
 import fix_yahoo_finance as yf
 import matplotlib.pyplot as plt
 
-def get_datasets(stock_name):
-    if (stock_name == "Amazon"):
-        ticker = yf.Ticker("AMZN")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "Google"):
-        ticker = yf.Ticker("GOOG")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "Apple"):
-        ticker = yf.Ticker("AAPL")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "Microsoft"):
-        ticker = yf.Ticker("MSFT")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "AAL"):
-        ticker = yf.Ticker("AAL")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "Tesla"):
-        ticker = yf.Ticker("TSLA")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
-    elif (stock_name == "Bitcoin"):
-        ticker = yf.Ticker("BTC-USD")
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
+def cleanup_dataframes(dataframes):
+    for i in range(l):
+        d.isna().any()
+        d = d.loc[:, (d != 0).any(axis=1)]
+    return dataframes
 
-    elif (stock_name== "Aut"):
-        symbols = ["VOE.VI"]
+def get_datasets(stock_name,data_columns):
+
+    if (stock_name== "MixedTech"):
+        symbols = ["Amazon","Tesla","Apple","Google","Microsoft"]
         datasets = []
         for s in symbols:
-            ticker = yf.Ticker(s)
-            dataset = ticker.history(period='max')
-            dataset.isna().any()
-            datasets.append(dataset)
-        return datasets
-
-    elif (stock_name== "MixedTech"):
-        symbols = ["AMZN","TSLA","AAPL","GOOG","MSFT"]
-        datasets = []
-        for s in symbols:
-            ticker = yf.Ticker(s)
-            dataset = ticker.history(period='max')
-            dataset.isna().any()
-            datasets.append(dataset)
-        return datasets
-
-    elif (stock_name== "Mixed"):
-        symbols = ["GE","VWAGY","BMWYY","F"]
-        #symbols = ["TSLA","AMD"]
-        datasets = []
-        for s in symbols:
-            ticker = yf.Ticker(s)
-            dataset = ticker.history(period='max')
-            dataset.isna().any()
-            datasets.append(dataset)
+            datasets.append(get_single_dataset(s,data_columns))
         return datasets
 
     elif (stock_name== "MixedCrypto"):
-        symbols = ["BTC-USD","ETH-USD"]
+        symbols = ["Bitcoin","ETH-USD"]
         datasets = []
         for s in symbols:
-            ticker = yf.Ticker(s)
-            dataset = ticker.history(period='max')
-            dataset.isna().any()
-            datasets.append(dataset)
+            datasets.append(get_single_dataset(s,data_columns))
         return datasets
+
+    elif (stock_name== "eko"):
+        symbols = ["Aixtron","GAIA","SunOpta"]
+        datasets = []
+        for s in symbols:
+            datasets.append(get_single_dataset(s,data_columns))
+        return datasets
+
+    elif (stock_name== "portfolio"):
+        symbols = ["Infineon","Aixtron","GAIA","SunOpta"]
+        datasets = []
+        for s in symbols:
+            datasets.append(get_single_dataset(s,data_columns))
+        return datasets
+    elif(stock_name=="SemiCon"):
+        symbols = ["Aixtron", "Infineon"]
+        datasets = []
+        for s in symbols:
+            datasets.append(get_single_dataset(s,data_columns))
+        return datasets
+
     elif (stock_name== "SinTest"):
         datasets = []
 
         return datasets
-    elif (stock_name== "eko"):
-        symbols = ["AIXA.DE"]
-        datasets = []
-        for s in symbols:
-            ticker = yf.Ticker(s)
-            dataset = ticker.history(period='max')
-            dataset.isna().any()
-            datasets.append(dataset)
-        return datasets
+
     else:
-        ticker = yf.Ticker(stock_name)
-        dataset = ticker.history(period='max')
-        dataset.isna().any()
-        return [dataset]
+        return [get_single_dataset(stock_name,data_columns)]
+
+
+
+def get_single_dataset(stock_name,data_columns):
+    if (stock_name == "Amazon"):
+        ticker_name = "AMZN"
+    elif (stock_name == "Google"):
+        ticker_name = "GOOG"
+    elif (stock_name == "Apple"):
+        ticker_name = "AAPL"
+    elif (stock_name == "Microsoft"):
+        ticker_name = "MSFT"
+    elif (stock_name == "Tesla"):
+        ticker_name = "TSLA"
+
+
+    elif (stock_name == "Bitcoin"):
+        ticker_name = "BTC-USD"
+    elif (stock_name == "Ethereum"):
+        ticker_name = "ETH-USD"
+
+    elif (stock_name == "Aixtron"):
+        ticker_name = "AIXA.DE"
+    elif (stock_name == "Gaia"):
+        ticker_name = "GAIA"
+    elif (stock_name == "SunOpta"):
+        ticker_name = "STKL"
+    elif (stock_name == "Infineon"):
+        ticker_name = "IFX.DE"
+    else:
+        ticker_name = stock_name
+
+    ticker = yf.Ticker(ticker_name)
+    dataset = ticker.history(period='max').get(data_columns)
+    dataset  = dataset[~(dataset == 0).any(axis=1)]
+    dataset.isna().any()
+    return dataset
 
 '''***************************************PLOTTING*****************************************************'''
 
