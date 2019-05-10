@@ -15,9 +15,12 @@ matplotlib.rc('font',**{'family':'monospace'})
 matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 
-stock_names=["Infineon","Aixtron","Gaia","SunOpta"]#
+stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
-model_names = ["portfolio_2_256-256_5y"]*len(stock_names)
+model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
+
+#stock_names = ["Bitcoin"]
+#model_names = ["crypto_2_256-256_5y"]
 
 #model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)

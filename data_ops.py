@@ -1,12 +1,6 @@
 import fix_yahoo_finance as yf
 import matplotlib.pyplot as plt
 
-def cleanup_dataframes(dataframes):
-    for i in range(l):
-        d.isna().any()
-        d = d.loc[:, (d != 0).any(axis=1)]
-    return dataframes
-
 def get_datasets(stock_name,data_columns):
 
     if (stock_name== "MixedTech"):
@@ -16,8 +10,8 @@ def get_datasets(stock_name,data_columns):
             datasets.append(get_single_dataset(s,data_columns))
         return datasets
 
-    elif (stock_name== "MixedCrypto"):
-        symbols = ["Bitcoin","ETH-USD"]
+    elif (stock_name== "crypto"):
+        symbols = ["Bitcoin","Ethereum"]
         datasets = []
         for s in symbols:
             datasets.append(get_single_dataset(s,data_columns))
