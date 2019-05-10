@@ -14,7 +14,7 @@
             },
 			{
 				"type": "dropout",
-				"dropout_rate": 0.05
+				"dropout_rate": 0.2
 			},
 			{
 				"type": "lstm",
@@ -24,7 +24,7 @@
             },
 			{
 				"type": "dropout",
-				"dropout_rate": 0.05
+				"dropout_rate": 0.2
 			},
 			{
 				"type": "dense",

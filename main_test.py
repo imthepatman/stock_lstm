@@ -17,7 +17,10 @@ matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
-model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
+#model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
+model_names = ["Infineon_2_256-256_5y","Aixtron_2_256-256_5y","Gaia_2_256-256_5y","SunOpta_2_256-256_5y","Bitcoin_2_256-256_5y"]
+#stock_names = ["SunOpta","Bitcoin"]
+#model_names = ["SunOpta_2_256-256_5y","Bitcoin_2_256-256_5y"]
 
 #stock_names = ["Bitcoin"]
 #model_names = ["crypto_2_256-256_5y"]
@@ -176,16 +179,16 @@ for num in range(len(stock_names)):
                      verticalalignment='top', bbox=props)
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
-            prediction_mean = np.insert(prediction_mean,0,0)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error-prediction_mean),main_prediction[1]*(1+3*prediction_error-prediction_mean),color=color_styles[1], alpha=.1)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error-prediction_mean),main_prediction[1]*(1+2*prediction_error-prediction_mean),color=color_styles[1], alpha=.2)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error-prediction_mean),main_prediction[1]*(1+prediction_error-prediction_mean),color=color_styles[1], alpha=.3)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 3 * prediction_error-prediction_mean), color=color_styles[1], alpha=.1)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 2 * prediction_error-prediction_mean), color=color_styles[1], alpha=.2)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + prediction_error-prediction_mean), color=color_styles[1], alpha=.3)
+
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error),main_prediction[1]*(1+3*prediction_error),color=color_styles[1], alpha=.1)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error),main_prediction[1]*(1+2*prediction_error),color=color_styles[1], alpha=.2)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_styles[1], alpha=.3)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error),
+                             main_prediction[1] * (1 + 3 * prediction_error), color=color_styles[1], alpha=.1)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error),
+                             main_prediction[1] * (1 + 2 * prediction_error), color=color_styles[1], alpha=.2)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error),
+                             main_prediction[1] * (1 + prediction_error), color=color_styles[1], alpha=.3)
 
         ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)

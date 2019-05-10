@@ -202,7 +202,7 @@ class Model:
         prediction_mean = prediction_rates/p_counter
         prediction_mean_sq = prediction_rates_sq/p_counter
         #print(prediction_mean,prediction_mean_sq,p_counter)
-        prediction_error = np.sqrt((prediction_mean_sq - np.power(prediction_mean,2)*(1-1/p_counter))/p_counter)
+        prediction_error = np.sqrt((prediction_mean_sq - np.power(prediction_mean,2)*(1-1/p_counter)))
         #print(prediction_mean,prediction_error)
         return(prediction_sign_mean,prediction_mean,prediction_error)
 
