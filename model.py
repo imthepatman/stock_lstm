@@ -25,6 +25,7 @@ class Model:
         for layer in configs['model']['layers']:
             neurons = layer['neurons'] if 'neurons' in layer else None
             dropout_rate = layer['dropout_rate'] if 'dropout_rate' in layer else None
+            recurrent_dropout = layer['recurrent_dropout'] if 'recurrent_dropout' in layer else None
             activation = layer['activation'] if 'activation' in layer else None
             return_seq = layer['return_seq'] if 'return_seq' in layer else None
             input_timesteps = layer['input_timesteps'] if 'input_timesteps' in layer else None
@@ -33,9 +34,9 @@ class Model:
             if layer['type'] == 'dense':
                 self.model.add(Dense(neurons, activation=activation))
             if layer['type'] == 'lstm':
-                self.model.add(LSTM(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,recurrent_dropout=dropout_rate))
+                self.model.add(LSTM(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,dropout=dropout_rate,recurrent_dropout=recurrent_dropout))
             if layer['type'] == 'gru':
-                self.model.add(GRU(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,recurrent_dropout=dropout_rate))
+                self.model.add(GRU(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,dropout=dropout_rate,recurrent_dropout=recurrent_dropout))
             if layer['type'] == 'dropout':
                 self.model.add(Dropout(rate = dropout_rate))
 
@@ -46,7 +47,7 @@ class Model:
         elif configs['model']['optimizer'] == 'nesterov':
             optimizer = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
         elif configs['model']['optimizer'] == 'rmsprop':
-            optimizer = optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
+            optimizer = optimizers.RMSprop(lr=0.01, rho=0.9, epsilon=None, decay=0.0)
         else:
             optimizer = configs['model']['optimizer']
 
@@ -115,13 +116,17 @@ class Model:
         prediction = []
         for i in range(prediction_len):
             #print("frame ",i,curr_frame)
-            curr_frame_norm = self.normalize_windows(curr_frame, normalize)
+            curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
             predicted = self.model.predict(curr_frame_norm)
             prediction.append(self.inverse_transform_prediction([curr_frame], predicted)[0])
 
             curr_frame = curr_frame[1:]
+            curr_tmp = curr_frame[-1]
+            curr_tmp[0] = prediction[-1]
+            #print(curr_tmp)
             #curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
-            curr_frame = np.insert(curr_frame, [window_size - 2], [prediction[-1],curr_frame[-1][1]], axis=0)
+            #curr_frame = np.insert(curr_frame, [window_size - 2], [prediction[-1],curr_frame[-1][1]], axis=0)
+            curr_frame = np.insert(curr_frame, [window_size - 2], curr_tmp, axis=0)
         return prediction
 
     def predict_sequences_multiple(self, data,window_size, normalize, prediction_len):
@@ -134,7 +139,7 @@ class Model:
             prediction = []
             for j in range(prediction_len):
                 #print(curr_frame)
-                curr_frame_norm = self.normalize_windows(curr_frame,normalize)
+                curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
                 #print(curr_frame_norm)
                 predicted = self.model.predict(curr_frame_norm)
                 #print(predicted)
@@ -202,7 +207,7 @@ class Model:
         prediction_mean = prediction_rates/p_counter
         prediction_mean_sq = prediction_rates_sq/p_counter
         #print(prediction_mean,prediction_mean_sq,p_counter)
-        prediction_error = np.sqrt((prediction_mean_sq - np.power(prediction_mean,2)*(1-1/p_counter))/p_counter)
+        prediction_error = np.sqrt(prediction_mean_sq - np.power(prediction_mean,2)*(1-1/p_counter))
         #print(prediction_mean,prediction_error)
         return(prediction_sign_mean,prediction_mean,prediction_error)
 
@@ -232,7 +237,7 @@ class Model:
             tranformed_predictions.append(prediction_input[0] * (1 + prediction))
         return (tranformed_predictions)
 
-    def normalize_windows(self, window_data, single_window=False):
+    def relative_normalize_window(self, window_data, single_window=False):
         '''Normalise window with a base value of zero'''
         normalised_data = []
         window_data = [window_data] if single_window else window_data
@@ -292,7 +297,7 @@ class Model:
     def get_next_window(self, data, i, seq_len, normalize):
         '''Generates the next data window from the given index location i'''
         window = data[i:i + seq_len]
-        window = self.normalize_windows(window, single_window=True)[0] if normalize else window
+        window = self.relative_normalize_window(window, single_window=True)[0] if normalize else window
         x = window[:-1]
         y = window[-1, [0]]
         return x, y

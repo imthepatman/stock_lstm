@@ -1,5 +1,7 @@
 import fix_yahoo_finance as yf
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy import signal
 
 def get_datasets(stock_name,data_columns):
 
@@ -82,6 +84,9 @@ def get_single_dataset(stock_name,data_columns):
     dataset.isna().any()
     return dataset
 
+def filter_data(data_series,window_size=5,order=3):
+    filtered_data = signal.savgol_filter(np.array(data_series),window_size,order,axis=0)
+    return(filtered_data)
 '''***************************************PLOTTING*****************************************************'''
 
 def plot_results(predicted_data, true_data):

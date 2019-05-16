@@ -12,7 +12,7 @@ if(len(sys.argv)==5) :
     resume = sys.argv[4]
     window_size = 61
     interval_min = -5*365
-    interval_max = -100
+    interval_max = None
     normalize = True
 
     batch_size = 64
@@ -28,12 +28,15 @@ if(len(sys.argv)==5) :
 
     print(datasets[0].tail())
 
+    filter_window_size = 21
+    filter_order = 3
 
-
-    data_train  = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
+    data_original = [pd.DataFrame(ds).values[interval_min:interval_max]for ds in datasets]
+    #data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
+    data_train  = [filter_data(d,filter_window_size,filter_order) for d in data_original]
     #print(data_train[0])
 
-    #data_train = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
+    #data_train =
     model = Model(model_name)
 
     data_x, datay = model.init_window_data(data_train,window_size,normalize)
@@ -58,7 +61,7 @@ if(len(sys.argv)==5) :
     model.save()
 
     if(test_model):
-        data_test = [pd.DataFrame(datasets[0]).get(data_columns).values[-1000:]]
+        data_test = [data_train[0][-1000:]]
         #data_test = [data_train[0][-100:]]
 
         x_test,y_test = model.init_window_data(data_test, window_size, False)

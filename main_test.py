@@ -17,10 +17,10 @@ matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
 
 stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
-model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
+#model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
 
-#stock_names = ["Bitcoin"]
-#model_names = ["crypto_2_256-256_5y"]
+#stock_names = ["Infineon"]
+model_names = ["Infineon_1_10_5y_filter-3","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
 
 #model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)
@@ -43,7 +43,8 @@ for num in range(len(stock_names)):
         interval_max = None
         show = False
 
-        color_styles = ['#1f77b4','#2ca02c','#ff7f0e','#d62728','#9467bd','#8c564b','#bcbd22']
+        color_lines = ['#1f77b4', '#2ca02c', '#ff7f0e', '#d62728', '#9467bd', '#8c564b', '#bcbd22']
+        color_palette = {"blue":"#1f77b4","wine_red":"#794044","green":"#2ca02c"}
 
         abs_dir = os.path.dirname(os.path.realpath(__file__))
         config = json.load(open(abs_dir + '/model_config.json', 'r'))
@@ -54,9 +55,12 @@ for num in range(len(stock_names)):
         datasets = get_datasets(stock_name,data_columns)
         print(datasets[0].tail())
 
+        filter_window_size = 21
+        filter_order = 3
 
-
-        data_test = [pd.DataFrame(datasets[0]).values[interval_min:interval_max]]
+        data_original = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
+        # data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
+        data_test = [filter_data(d, filter_window_size, filter_order) for d in data_original]
 
         dataframe = pd.DataFrame(datasets[0])
 
@@ -69,8 +73,11 @@ for num in range(len(stock_names)):
         model = Model(model_name)
         model.load()
 
-        x, y = model.init_window_data(data_test, window_size, False)
-        real_stock_price = np.concatenate(y)
+        x_ori, y_ori = model.init_window_data(data_original, window_size, False)
+        x_test, y_test = model.init_window_data(data_test, window_size, False)
+
+        filtered_stock_price = np.concatenate(y_test)
+        real_stock_price = np.concatenate(y_ori)
 
 
         fig = plt.figure(figsize=(16,7))
@@ -80,19 +87,21 @@ for num in range(len(stock_names)):
         ax2 = plt.subplot2grid((3, 6), (0, 3), colspan=3, rowspan=3)
 
         today_date = data_dates[-1].strftime("%d.%m.%Y")
-        ax1.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_styles[1], zorder=10)
-        ax2.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_styles[1], zorder=10)
+        ax1.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_palette["green"], zorder=10)
+        ax2.plot([data_dates[-1]], [real_stock_price[-1]], 'o', label="Heute - "+today_date, color=color_palette["green"], zorder=10)
 
-        ax1.plot(data_dates[-view_length_1:], real_stock_price[-view_length_1:],'-', label ='bisheriger Preisverlauf',color=color_styles[0])
-        ax2.plot(data_dates[-view_length_2:], real_stock_price[-view_length_2:],'-', label ='bisheriger Preisverlauf',color=color_styles[0])
+        ax1.plot(data_dates[-view_length_1:], real_stock_price[-view_length_1:],'-', label ='bisheriger Preisverlauf',color=color_palette["blue"])
+        ax1.plot(data_dates[-view_length_1:], filtered_stock_price[-view_length_1:],':', label ='gefilterter Preisverlauf',color=color_palette["blue"],alpha=0.7)
+        ax2.plot(data_dates[-view_length_2:], real_stock_price[-view_length_2:],'-', label ='bisheriger Preisverlauf',color=color_palette["blue"])
+        ax2.plot(data_dates[-view_length_2:], filtered_stock_price[-view_length_2:],':', label ='gefilterter Preisverlauf',color=color_palette["blue"],alpha=0.7)
 
         main_prediction = []
         #2 week plot
         for p in range(2):
             pos = p
             prediction_length = 7
-            predicted_stock_price = model.predict_sequence(x[-pos-1], window_size, normalize, prediction_length)
-            predicted_stock_price.insert(0, y[-pos - 1][0])
+            predicted_stock_price = model.predict_sequence(x_test[-pos - 1], window_size, normalize, prediction_length)
+            predicted_stock_price.insert(0, y_ori[-pos - 1][0])
             prediction_dates = [data_dates[-pos - 1]]
             for j in range(1, prediction_length + 1):
                 prediction_dates.append(prediction_dates[j - 1] + dt.timedelta(days=1))
@@ -102,7 +111,7 @@ for num in range(len(stock_names)):
             if(p==0):
                 main_prediction = [prediction_dates,np.array(predicted_stock_price)]
             ax1.plot(prediction_dates, predicted_stock_price, '--',
-                     label=str(prediction_length) + '-Tage Vorhersage vor '+str(delta_days)+' Tagen',color=color_styles[1+p],zorder=5)
+                     label=str(prediction_length) + '-Tage Vorhersage vor '+str(delta_days)+' Tagen', color=color_lines[1 + p], zorder=5)
         zorder=5
 
         relative_prediction_positions = [i * 7 for i in range(0, 4)]  # [0,5,10,15,20,30,35,40]
@@ -118,10 +127,10 @@ for num in range(len(stock_names)):
             # Getting the predicted stock price
 
             #predict test by looking at last window_size entries of dataset_total
-            data_initial = x[-pos-1]
+            data_initial = x_test[-pos - 1]
 
             predicted_stock_price = model.predict_sequence(data_initial, window_size,normalize, prediction_length)
-            predicted_stock_price.insert(0,y[-pos-1][0])
+            predicted_stock_price.insert(0, y_ori[-pos - 1][0])
 
             #predicted_stock_price = sc.inverse_transform(np.reshape(predicted_stock_price,(-1,1)))
 
@@ -133,7 +142,7 @@ for num in range(len(stock_names)):
 
             delta_days = (data_dates[-1] - data_dates[-pos - 1]).days
             ax2.plot(prediction_dates, predicted_stock_price,
-                     '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(delta_days) + " Tagen",color = color_styles[1+i],zorder=zorder)
+                     '--', label=str(prediction_length) + '-Tage Vorhersage vor ' + str(delta_days) + " Tagen", color = color_lines[1 + i], zorder=zorder)
             zorder =0
             # Visualising the results
         fig.suptitle(stock_name, fontweight='bold',y=1.05,fontsize=20)
@@ -146,10 +155,10 @@ for num in range(len(stock_names)):
         ax1.legend(loc=0)
         ax2.legend(loc=0)
 
-        props = dict(boxstyle='round,pad=1', facecolor=color_styles[0],edgecolor=color_styles[0], alpha=0.5)
+        props = dict(boxstyle='round,pad=1', facecolor=color_palette["blue"],edgecolor=color_palette["blue"], alpha=0.5)
 
         if evaluate_performance:
-            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates,x, y, 100, window_size, normalize, 7)
+            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates, x_test, y_ori, 100, window_size, normalize, 7)
             print("prediction sign rate ",prediction_sign_rates)
             print("prediction mean ",prediction_mean)
             print("prediction errors ", prediction_error)
@@ -177,15 +186,15 @@ for num in range(len(stock_names)):
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
             prediction_mean = np.insert(prediction_mean,0,0)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error-prediction_mean),main_prediction[1]*(1+3*prediction_error-prediction_mean),color=color_styles[1], alpha=.1)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error-prediction_mean),main_prediction[1]*(1+2*prediction_error-prediction_mean),color=color_styles[1], alpha=.2)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error-prediction_mean),main_prediction[1]*(1+prediction_error-prediction_mean),color=color_styles[1], alpha=.3)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error-prediction_mean),main_prediction[1]*(1+3*prediction_error-prediction_mean),color=color_palette["green"], alpha=.1)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error-prediction_mean),main_prediction[1]*(1+2*prediction_error-prediction_mean),color=color_palette["green"], alpha=.2)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error-prediction_mean),main_prediction[1]*(1+prediction_error-prediction_mean),color=color_palette["green"], alpha=.3)
             ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 3 * prediction_error-prediction_mean), color=color_styles[1], alpha=.1)
+                             main_prediction[1] * (1 + 3 * prediction_error-prediction_mean), color=color_palette["green"], alpha=.1)
             ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 2 * prediction_error-prediction_mean), color=color_styles[1], alpha=.2)
+                             main_prediction[1] * (1 + 2 * prediction_error-prediction_mean), color=color_palette["green"], alpha=.2)
             ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + prediction_error-prediction_mean), color=color_styles[1], alpha=.3)
+                             main_prediction[1] * (1 + prediction_error-prediction_mean), color=color_palette["green"], alpha=.3)
 
         ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
@@ -223,9 +232,9 @@ for num in range(len(stock_names)):
         ax2.grid(True,'minor',ls=':',lw=.5,c='k',alpha=.3)
 
         ax1.fill_between(data_dates[-view_length_1:], ax1.get_ylim()[0], real_stock_price[-view_length_1:],
-                         color=color_styles[0], alpha=.3)
+                         color=color_palette["blue"], alpha=.3)
         ax2.fill_between(data_dates[-view_length_2:], ax2.get_ylim()[0], real_stock_price[-view_length_2:],
-                         color=color_styles[0], alpha=.3)
+                         color=color_palette["blue"], alpha=.3)
 
 
         plt.savefig(os.path.join(abs_dir, "figs/" + stock_name + "_" + str(view_length_2) + ".png"),bbox_inches='tight',dpi=100)
