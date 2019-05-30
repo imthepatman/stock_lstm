@@ -12,34 +12,19 @@ if(len(sys.argv)==5) :
     resume = sys.argv[4]
     window_size = 61
     interval_min = -5*365
-    interval_max = None
+    interval_max = -100
     normalize = True
 
     batch_size = 64
     shuffle = True
 
-    test_model = True
+    test_model = False
+
 
     abs_dir = os.path.dirname(os.path.realpath(__file__))
     config = json.load(open(abs_dir+'/model_config.json', 'r'))
-    data_columns = config["data_columns"]
 
-    datasets = get_datasets(stock_name,data_columns)
-
-    print(datasets[0].tail())
-
-    filter_window_size = 21
-    filter_order = 3
-
-    data_original = [pd.DataFrame(ds).values[interval_min:interval_max]for ds in datasets]
-    #data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
-    data_train  = [filter_data(d,filter_window_size,filter_order) for d in data_original]
-    #print(data_train[0])
-
-    #data_train =
     model = Model(model_name)
-
-    data_x, datay = model.init_window_data(data_train,window_size,normalize)
 
     if (resume == "y"):
         model.load()
@@ -49,22 +34,55 @@ if(len(sys.argv)==5) :
         print("resume has to be y/n")
         quit()
 
-    #model.train(data_train, window_size, normalize, epochs, batch_size, validation_split)
+    data_columns = config["data_columns"]
+    datasets = get_datasets(stock_name,data_columns)
 
-    steps_per_epoch = math.ceil((len(data_x)/ batch_size))
-    model.train_generator(
-        epochs=epochs,
-        batch_size=batch_size,
-        steps_per_epoch=steps_per_epoch,
-        shuffle=shuffle
-    )
+    print(datasets[0].tail())
+
+    filter_window_size = 21
+    filter_order = 5
+
+    data_original = [pd.DataFrame(ds).values for ds in datasets]
+    #data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
+    data_train  = [filter_data(d[interval_min:interval_max],filter_window_size,filter_order) for d in data_original]
+    #print(data_train[0])
+
+    #data_train =
+
+    x_train, y_train = model.window_data(data_train, window_size, normalize)
+
+    steps_per_epoch = math.ceil((len(x_train) / batch_size))
+
+    if(interval_max!=None):
+
+        data_val = [filter_data(d[interval_max:], filter_window_size, filter_order) for d in data_original]
+        x_val, y_val = model.window_data(data_val, window_size, normalize)
+
+        model.train_generator(
+            x_train,
+            y_train,
+            epochs=epochs,
+            batch_size=batch_size,
+            steps_per_epoch=steps_per_epoch,
+            shuffle=shuffle,
+            x_val=x_val,
+            y_val=y_val
+        )
+    else:
+        model.train_generator(
+            x_train,
+            y_train,
+            epochs=epochs,
+            batch_size=batch_size,
+            steps_per_epoch=steps_per_epoch,
+            shuffle=shuffle
+        )
     model.save()
 
     if(test_model):
-        data_test = [data_train[0][-1000:]]
-        #data_test = [data_train[0][-100:]]
+        data_test = [data_original[0][-1000:]]
 
-        x_test,y_test = model.init_window_data(data_test, window_size, False)
+        x_test,y_test = model.window_data(data_test, window_size, False)
 
         predictions_multiseq = model.predict_sequences_multiple(data_test, window_size, normalize, window_size)
         #predictions_fullseq = model.predict_sequence_full(data_test, window_size,normalize)

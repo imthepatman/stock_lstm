@@ -2,41 +2,43 @@ import fix_yahoo_finance as yf
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
+import datetime as dt
+import pandas as pd
 
-def get_datasets(stock_name,data_columns):
+def get_datasets(stock_name,data_columns,append_intraday=False):
 
     if (stock_name== "MixedTech"):
         symbols = ["Amazon","Tesla","Apple","Google","Microsoft"]
         datasets = []
         for s in symbols:
-            datasets.append(get_single_dataset(s,data_columns))
+            datasets.append(get_single_dataset(s,data_columns,append_intraday))
         return datasets
 
     elif (stock_name== "crypto"):
         symbols = ["Bitcoin","Ethereum"]
         datasets = []
         for s in symbols:
-            datasets.append(get_single_dataset(s,data_columns))
+            datasets.append(get_single_dataset(s,data_columns,append_intraday))
         return datasets
 
     elif (stock_name== "eko"):
         symbols = ["Aixtron","GAIA","SunOpta"]
         datasets = []
         for s in symbols:
-            datasets.append(get_single_dataset(s,data_columns))
+            datasets.append(get_single_dataset(s,data_columns,append_intraday))
         return datasets
 
     elif (stock_name== "portfolio"):
         symbols = ["Infineon","Aixtron","GAIA","SunOpta"]
         datasets = []
         for s in symbols:
-            datasets.append(get_single_dataset(s,data_columns))
+            datasets.append(get_single_dataset(s,data_columns,append_intraday))
         return datasets
     elif(stock_name=="SemiCon"):
         symbols = ["Aixtron", "Infineon"]
         datasets = []
         for s in symbols:
-            datasets.append(get_single_dataset(s,data_columns))
+            datasets.append(get_single_dataset(s,data_columns,append_intraday))
         return datasets
 
     elif (stock_name== "SinTest"):
@@ -45,11 +47,11 @@ def get_datasets(stock_name,data_columns):
         return datasets
 
     else:
-        return [get_single_dataset(stock_name,data_columns)]
+        return [get_single_dataset(stock_name,data_columns,append_intraday)]
 
 
 
-def get_single_dataset(stock_name,data_columns):
+def get_single_dataset(stock_name,data_columns,append_intraday=False):
     if (stock_name == "Amazon"):
         ticker_name = "AMZN"
     elif (stock_name == "Google"):
@@ -78,10 +80,26 @@ def get_single_dataset(stock_name,data_columns):
     else:
         ticker_name = stock_name
 
-    ticker = yf.Ticker(ticker_name)
-    dataset = ticker.history(period='max').get(data_columns)
+    #ticker = yf.Ticker(ticker_name)
+    dataset = yf.download(ticker_name,period='max').get(data_columns)
+
     dataset  = dataset[~(dataset == 0).any(axis=1)]
     dataset.isna().any()
+
+    if append_intraday:
+        today = dt.datetime.today()
+        dataset_intraday = yf.download(ticker_name,period='1d',interval='1m').get(data_columns)
+        dataset_intraday  = dataset_intraday[~(dataset_intraday == 0).any(axis=1)]
+        dataset_intraday.isna().any()
+
+        mask = pd.to_datetime(dataset.index.values).strftime("%Y-%m-%d") == today.strftime("%Y-%m-%d")
+        mask_intraday = pd.to_datetime(dataset_intraday.index.values).strftime("%Y-%m-%d") == today.strftime("%Y-%m-%d")
+        if(not mask.any() and mask_intraday.any()):
+            append_values = np.mean(dataset.values[-7:],axis=0)
+            dataset_tmp = dataset_intraday[mask_intraday]
+            append_values[0] = np.mean(dataset_tmp.values[-60:],axis=0)[0]
+            data_tmp = pd.DataFrame([append_values],index=[today],columns = data_columns)
+            dataset = pd.concat([dataset,data_tmp])
     return dataset
 
 def filter_data(data_series,window_size=5,order=3):

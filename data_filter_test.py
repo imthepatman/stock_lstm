@@ -10,7 +10,7 @@ interval_max = None
 
 stock_name = "Infineon"
 data_columns=["Close","Volume"]
-datasets = get_datasets(stock_name,data_columns)
+datasets = get_datasets(stock_name,data_columns,True)
 
 data = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
 

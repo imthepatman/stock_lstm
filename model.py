@@ -6,6 +6,7 @@ from keras.layers import Dense, Activation, Dropout, LSTM,GRU
 from keras.models import Sequential, load_model
 from keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
 from keras import optimizers
+import keras
 import keras.backend as K
 import os
 import math
@@ -58,37 +59,41 @@ class Model:
 
 
     '''***************************************TRAINING*****************************************************'''
-    def train(self, data,sequence_length, normalize, epochs, batch_size,validation_split):
-        print('[Model] Training Started')
-        print('[Model] %s epochs, %s batch size' % (epochs, batch_size))
-        x,y = self.get_data(data,sequence_length,normalize)
-        self.model.fit(
-            x,
-            y,
-            epochs=epochs,
-            batch_size=batch_size,
-            validation_split=validation_split
-        )
+    def train_generator(self, x_train, y_train, epochs, batch_size, steps_per_epoch, shuffle=True, early_stopping_patience=1000, x_val=None, y_val=None):
 
-    def train_generator(self, epochs, batch_size, steps_per_epoch, shuffle=True, early_stopping_patience=1000):
-
-        batch_generator = self.generate_sequential_batch
+        training_batch_generator = BatchGenerator(x_train,y_train,batch_size,shuffle)
 
         early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
-        learning_rate_scheduler_callback = LearningRateScheduler(self.step_decay_lr)
-        checkpoint = ModelCheckpoint(self.abs_dir+"/models/rnn_"+self.name+"_cp", monitor='loss', verbose=1, save_best_only=True, mode='min')
-        callbacks_list = [checkpoint,early_stopping_callback]
+
 
         print('[Model] Training Started')
         print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
         time_start = time.time()
-        self.model.fit_generator(
-            batch_generator(batch_size,shuffle),
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            workers=1,
-            callbacks=callbacks_list
-        )
+        if((x_val != None).all() and (y_val!= None).all()):
+            validation_batch_generator = BatchGenerator(x_val, y_val, 10, shuffle)
+
+            checkpoint = ModelCheckpoint(self.abs_dir + "/models/rnn_" + self.name + "_cp", monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+            callbacks_list = [checkpoint, early_stopping_callback]
+
+            self.model.fit_generator(
+                training_batch_generator,
+                validation_data=validation_batch_generator,
+                steps_per_epoch=steps_per_epoch,
+                epochs=epochs,
+                workers=1,
+                callbacks=callbacks_list
+            )
+        else:
+            checkpoint = ModelCheckpoint(self.abs_dir + "/models/rnn_" + self.name + "_cp", monitor='loss', verbose=1, save_best_only=True, mode='min')
+            callbacks_list = [checkpoint, early_stopping_callback]
+
+            self.model.fit_generator(
+                training_batch_generator,
+                steps_per_epoch=steps_per_epoch,
+                epochs=epochs,
+                workers=1,
+                callbacks=callbacks_list
+            )
 
         print('[Model] Training completed in ' + '{0:.1f}'.format(time.time()-time_start) + "s")
 
@@ -103,8 +108,8 @@ class Model:
     '''***************************************PREDICTION*****************************************************'''
     def predict_point_by_point(self, data, window_size, normalize):
         # Predict each timestep given the last sequence of true data, in effect only predicting 1 step ahead each time
-        x_data,y_data = self.init_window_data(data, window_size, False)
-        x_norm, y_norm = self.init_window_data(data, window_size, True)
+        x_data,y_data = self.window_data(data, window_size, False)
+        x_norm, y_norm = self.window_data(data, window_size, True)
         print('[Model] Predicting Point-by-Point...')
         predicted = self.inverse_transform_prediction(x_data,self.model.predict(x_norm))
         #predicted = np.reshape(predicted, (predicted.size,))
@@ -121,7 +126,7 @@ class Model:
             prediction.append(self.inverse_transform_prediction([curr_frame], predicted)[0])
 
             curr_frame = curr_frame[1:]
-            curr_tmp = curr_frame[-1]
+            curr_tmp = np.array(curr_frame[-1])
             curr_tmp[0] = prediction[-1]
             #print(curr_tmp)
             #curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
@@ -131,7 +136,7 @@ class Model:
 
     def predict_sequences_multiple(self, data,window_size, normalize, prediction_len):
         # Predict sequence of 50 steps before shifting prediction run forward by 50 steps
-        x_data, y_data = self.init_window_data(data, window_size, False)
+        x_data, y_data = self.window_data(data, window_size, False)
         print('[Model] Predicting Sequences Multiple...')
         prediction_seqs = []
         for i in range(int(np.shape(data)[1] / prediction_len)-1):
@@ -214,17 +219,16 @@ class Model:
 
     '''***************************************DATA OPERATIONS*****************************************************'''
 
-    def init_window_data(self,data,window_size,normalize):
-        self.data_x = []
-        self.data_y = []
+    def window_data(self,data,window_size,normalize):
+        data_x = []
+        data_y = []
         for d in data:
-            for i in range(len(d)-window_size):
+            for i in range(len(d) - window_size):
                 x, y = self.get_next_window(d, i, window_size, normalize)
-                self.data_x.append(x)
-                self.data_y.append(y)
-
-        print("[Model] Total data size is " + str(len(self.data_x)))
-        return np.array(self.data_x), np.array(self.data_y)
+                data_x.append(x)
+                data_y.append(y)
+        print("[Model] Total data size is " + str(len(data_x)))
+        return np.array(data_x),np.array(data_y)
 
     def inverse_transform_prediction(self, x_data, prediction_data):
         tranformed_predictions = []
@@ -251,10 +255,10 @@ class Model:
 
         return np.array(normalised_data)
 
-    def generate_sequential_batch(self,batch_size,shuffle):
+    def generate_sequential_batch(self,data_x,data_y,batch_size,shuffle):
         '''Yield a generator of training data from filename on given list of cols split for train/test'''
-        data_length = np.shape(self.data_x)[0]
-        window_size = np.shape(self.data_x)[1]
+        data_length = np.shape(data_x)[0]
+        window_size = np.shape(data_x)[1]
         indices = np.arange(data_length)
         #print("data x shape ",np.shape(self.data_x))
         if shuffle: np.random.shuffle(indices)
@@ -263,8 +267,8 @@ class Model:
             x_batch = []
             y_batch = []
             for b in range(batch_size):
-                x = self.data_x[indices[i]]
-                y = self.data_y[indices[i]]
+                x = data_x[indices[i]]
+                y = data_y[indices[i]]
                 x_batch.append(x)
                 y_batch.append(y)
                 i += 1
@@ -278,21 +282,6 @@ class Model:
                     if shuffle: np.random.shuffle(indices)
 
             yield np.array(x_batch), np.array(y_batch)
-
-    def generate_random_batch(self,batch_size):
-
-        while True:
-            batch_x = []
-            batch_y = []
-            indices = np.random.randint(0, np.shape(self.data_x)[0] - np.shape(self.data_x)[1], batch_size)
-            #print(indices)
-            for i in range(batch_size):
-                # choose random index in features
-                x = self.data_x[indices[i]]
-                y = self.data_y[indices[i]]
-                batch_x.append(x)
-                batch_y.append(y)
-            yield np.array(batch_x), np.array(batch_y)
 
     def get_next_window(self, data, i, seq_len, normalize):
         '''Generates the next data window from the given index location i'''
@@ -311,3 +300,38 @@ class Model:
     def load(self):
         self.model = load_model(self.abs_dir+"/models/rnn_" + self.name)
         print("[Model] " + self.name + " loaded")
+
+class BatchGenerator(keras.utils.Sequence):
+    'Generates data for Keras'
+    def __init__(self, data_x,data_y,batch_size,shuffle):
+        'Initialization'
+        self.batch_size = batch_size
+        self.data_x = data_x
+        self.data_y = data_y
+        self.data_len = len(data_y)
+        self.indices = np.arange(self.data_len)
+        self.shuffle = shuffle
+        self.on_epoch_end()
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        num_batches = int(np.floor(self.data_len / self.batch_size))
+        return num_batches
+
+    def __getitem__(self, index):
+        'Generate one batch of data'
+
+        x_batch = []
+        y_batch = []
+        for b in range(self.batch_size):
+            x = self.data_x[self.indices[index]]
+            y = self.data_y[self.indices[index]]
+            x_batch.append(x)
+            y_batch.append(y)
+
+        return np.array(x_batch), np.array(y_batch)
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        if self.shuffle == True:
+            np.random.shuffle(self.indices)

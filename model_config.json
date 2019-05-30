@@ -1,17 +1,17 @@
 {
-	"data_columns": ["Close"],
+	"data_columns": ["Close","Volume"],
 	"model": {
 		"loss": "mse",
 		"optimizer": "adam",
 		"layers": [
 			{
 				"type": "gru",
-				"neurons": 10,
+				"neurons": 20,
 				"return_seq": false,
 				"dropout_rate": 0,
 				"recurrent_dropout": 0,
                 "input_timesteps": 60,
-                "input_dim": 1
+                "input_dim": 2
             },
 			{
 				"type": "dense",

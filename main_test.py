@@ -19,8 +19,8 @@ stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
 #model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
 
-#stock_names = ["Infineon"]
-model_names = ["Infineon_1_10_5y_filter-3","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
+stock_names = ["SunOpta"]
+model_names = ["SunOpta_2_20_5y_filter-5","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
 
 #model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)
@@ -52,11 +52,11 @@ for num in range(len(stock_names)):
         # data_columns = ["Close","Open","High","Low","Volume"]
         # data_columns = ["Close","Open","Volume"]
 
-        datasets = get_datasets(stock_name,data_columns)
+        datasets = get_datasets(stock_name,data_columns,append_intraday=True)
         print(datasets[0].tail())
 
         filter_window_size = 21
-        filter_order = 3
+        filter_order = 5
 
         data_original = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
         # data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
@@ -73,8 +73,8 @@ for num in range(len(stock_names)):
         model = Model(model_name)
         model.load()
 
-        x_ori, y_ori = model.init_window_data(data_original, window_size, False)
-        x_test, y_test = model.init_window_data(data_test, window_size, False)
+        x_ori, y_ori = model.window_data(data_original, window_size, False)
+        x_test, y_test = model.window_data(data_test, window_size, False)
 
         filtered_stock_price = np.concatenate(y_test)
         real_stock_price = np.concatenate(y_ori)
@@ -185,16 +185,15 @@ for num in range(len(stock_names)):
                      verticalalignment='top', bbox=props)
             #plt.rc('text', usetex=False)
             prediction_error = np.insert(prediction_error,0,0)
-            prediction_mean = np.insert(prediction_mean,0,0)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error-prediction_mean),main_prediction[1]*(1+3*prediction_error-prediction_mean),color=color_palette["green"], alpha=.1)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error-prediction_mean),main_prediction[1]*(1+2*prediction_error-prediction_mean),color=color_palette["green"], alpha=.2)
-            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error-prediction_mean),main_prediction[1]*(1+prediction_error-prediction_mean),color=color_palette["green"], alpha=.3)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 3 * prediction_error-prediction_mean), color=color_palette["green"], alpha=.1)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + 2 * prediction_error-prediction_mean), color=color_palette["green"], alpha=.2)
-            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error-prediction_mean),
-                             main_prediction[1] * (1 + prediction_error-prediction_mean), color=color_palette["green"], alpha=.3)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-3*prediction_error),main_prediction[1]*(1+3*prediction_error),color=color_palette["green"], alpha=.1)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-2*prediction_error),main_prediction[1]*(1+2*prediction_error),color=color_palette["green"], alpha=.2)
+            ax1.fill_between(main_prediction[0],main_prediction[1]*(1-prediction_error),main_prediction[1]*(1+prediction_error),color=color_palette["green"], alpha=.3)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 3 * prediction_error),
+                             main_prediction[1] * (1 + 3 * prediction_error), color=color_palette["green"], alpha=.1)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - 2 * prediction_error),
+                             main_prediction[1] * (1 + 2 * prediction_error), color=color_palette["green"], alpha=.2)
+            ax2.fill_between(main_prediction[0], main_prediction[1] * (1 - prediction_error),
+                             main_prediction[1] * (1 + prediction_error), color=color_palette["green"], alpha=.3)
 
         ax2.text(1.05, 0.08, "Modell: \n" + model_name, transform=ax2.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
