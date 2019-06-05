@@ -52,6 +52,7 @@ class Model:
         else:
             optimizer = configs['model']['optimizer']
 
+        #self.model.compile(loss=configs['model']['loss'], optimizer=optimizer)
         self.model.compile(loss=configs['model']['loss'], optimizer=optimizer)
 
         print('[Model] Model Compiled')
@@ -65,6 +66,7 @@ class Model:
 
         early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
 
+        loss_weight = 0.99
 
         print('[Model] Training Started')
         print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
@@ -82,6 +84,7 @@ class Model:
                 epochs=epochs,
                 workers=1,
                 callbacks=callbacks_list
+                #class_weight={0:loss_weight,1:1.-loss_weight}
             )
         else:
             checkpoint = ModelCheckpoint(self.abs_dir + "/models/rnn_" + self.name + "_cp", monitor='loss', verbose=1, save_best_only=True, mode='min')
@@ -93,6 +96,7 @@ class Model:
                 epochs=epochs,
                 workers=1,
                 callbacks=callbacks_list
+                #class_weight={0: loss_weight, 1: 1. - loss_weight}
             )
 
         print('[Model] Training completed in ' + '{0:.1f}'.format(time.time()-time_start) + "s")
@@ -106,37 +110,35 @@ class Model:
         return lr
 
     '''***************************************PREDICTION*****************************************************'''
-    def predict_point_by_point(self, data, window_size, normalize):
+    def predict_point_by_point(self, data, window_size, normalize,n_outputs):
         # Predict each timestep given the last sequence of true data, in effect only predicting 1 step ahead each time
-        x_data,y_data = self.window_data(data, window_size, False)
-        x_norm, y_norm = self.window_data(data, window_size, True)
+        x_data,_,_ = self.window_data(data, window_size, False,n_outputs)
+        x_norm,_,_  = self.window_data(data, window_size, True,n_outputs)
         print('[Model] Predicting Point-by-Point...')
-        predicted = self.inverse_transform_prediction(x_data,self.model.predict(x_norm))
+        predicted = self.inverse_transform_prediction(x_data,[self.model.predict(x_norm)[0,0]])
         #predicted = np.reshape(predicted, (predicted.size,))
         return predicted
 
-    def predict_sequence(self, data_initial, window_size,normalize, prediction_len):
+    def predict_sequence(self, data_initial, window_size,normalize, prediction_len, n_outputs):
         # print("mulit predict for " + str(prediction_length) + " steps and window size "+ str(window_size))
         curr_frame = data_initial
         prediction = []
         for i in range(prediction_len):
             #print("frame ",i,curr_frame)
             curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
-            predicted = self.model.predict(curr_frame_norm)
-            prediction.append(self.inverse_transform_prediction([curr_frame], predicted)[0])
+            predicted = self.model.predict(curr_frame_norm)[0,0]
+            prediction.append(self.inverse_transform_prediction([curr_frame], [predicted])[0])
 
             curr_frame = curr_frame[1:]
             curr_tmp = np.array(curr_frame[-1])
             curr_tmp[0] = prediction[-1]
             #print(curr_tmp)
-            #curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
-            #curr_frame = np.insert(curr_frame, [window_size - 2], [prediction[-1],curr_frame[-1][1]], axis=0)
-            curr_frame = np.insert(curr_frame, [window_size - 2], curr_tmp, axis=0)
+            curr_frame = np.insert(curr_frame, window_size - n_outputs-1, curr_tmp, axis=0)
         return prediction
 
-    def predict_sequences_multiple(self, data,window_size, normalize, prediction_len):
+    def predict_sequences_multiple(self, data,window_size, normalize, prediction_len, n_outputs):
         # Predict sequence of 50 steps before shifting prediction run forward by 50 steps
-        x_data, y_data = self.window_data(data, window_size, False)
+        x_data,_,_  = self.window_data(data, window_size, False,n_outputs)
         print('[Model] Predicting Sequences Multiple...')
         prediction_seqs = []
         for i in range(int(np.shape(data)[1] / prediction_len)-1):
@@ -146,27 +148,17 @@ class Model:
                 #print(curr_frame)
                 curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
                 #print(curr_frame_norm)
-                predicted = self.model.predict(curr_frame_norm)
-                #print(predicted)
-                prediction.append(self.inverse_transform_prediction([curr_frame],predicted)[0])
+                predicted = self.model.predict(curr_frame_norm)[0,0]
+                prediction.append(self.inverse_transform_prediction([curr_frame],[predicted])[0])
                 curr_frame = curr_frame[1:]
-                curr_frame = np.insert(curr_frame, [window_size - 2], prediction[-1], axis=0)
+                curr_tmp = np.array(curr_frame[-1])
+                curr_tmp[0] = prediction[-1]
+                curr_frame = np.insert(curr_frame, window_size - n_outputs - 1, curr_tmp, axis=0)
             prediction_seqs.append(prediction)
         #print(prediction_seqs)
         return prediction_seqs
 
-    def predict_sequence_full(self, data, window_size):
-        # Shift the window by 1 new prediction each time, re-run predictions on new window
-        print('[Model] Predicting Sequences Full...')
-        curr_frame = data[0]
-        predicted = []
-        for i in range(len(data)):
-            predicted.append(self.model.predict(curr_frame[newaxis, :, :])[0, 0])
-            curr_frame = curr_frame[1:]
-            curr_frame = np.insert(curr_frame, [window_size - 2], predicted[-1], axis=0)
-        return predicted
-
-    def evaluate_prediction(self, dates,x, y, evaluation_length, window_size, normalize, prediction_length):
+    def evaluate_prediction(self, dates,x, y, evaluation_length, window_size, normalize, prediction_length,n_outputs):
         reference_data = y[-evaluation_length-prediction_length:].flatten()
         reference_dates = dates[-evaluation_length-prediction_length:]
         prediction_sign_counter = np.zeros(prediction_length)
@@ -182,7 +174,7 @@ class Model:
             date = reference_dates[index]
             data_initial = x[index]
 
-            prediction = self.predict_sequence(data_initial, window_size,normalize,prediction_length)
+            prediction = self.predict_sequence(data_initial, window_size,normalize,prediction_length,n_outputs)
             prediction = np.array(prediction).flatten()
             d_ref = np.zeros(prediction_length)
             d_pred = np.zeros(prediction_length)
@@ -219,22 +211,24 @@ class Model:
 
     '''***************************************DATA OPERATIONS*****************************************************'''
 
-    def window_data(self,data,window_size,normalize):
+    def window_data(self,data,window_size,normalize,n_outputs):
         data_x = []
         data_y = []
+        series_y = []
         for d in data:
             for i in range(len(d) - window_size):
-                x, y = self.get_next_window(d, i, window_size, normalize)
+                x, y,s_y = self.get_next_window(d, i, window_size, normalize,n_outputs)
                 data_x.append(x)
                 data_y.append(y)
+                series_y.append(s_y)
         print("[Model] Total data size is " + str(len(data_x)))
-        return np.array(data_x),np.array(data_y)
+        return np.array(data_x),np.array(data_y),np.array(series_y)
 
     def inverse_transform_prediction(self, x_data, prediction_data):
         tranformed_predictions = []
         for i in range(len(prediction_data)):
             inputs = x_data[i]
-            prediction = prediction_data[i][0]
+            prediction = prediction_data[i]
             prediction_input = inputs[0]
             #print(prediction_input)
             #print(prediction)
@@ -283,13 +277,14 @@ class Model:
 
             yield np.array(x_batch), np.array(y_batch)
 
-    def get_next_window(self, data, i, seq_len, normalize):
+    def get_next_window(self, data, i, seq_len, normalize,n_outputs):
         '''Generates the next data window from the given index location i'''
         window = data[i:i + seq_len]
         window = self.relative_normalize_window(window, single_window=True)[0] if normalize else window
-        x = window[:-1]
-        y = window[-1, [0]]
-        return x, y
+        x = window[:-n_outputs]
+        y = window[-n_outputs:,0]
+        s_y = window[-n_outputs, 0]
+        return x, y, s_y
 
     '''***************************************SAVE / LOAD*****************************************************'''
 

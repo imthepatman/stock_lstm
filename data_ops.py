@@ -42,9 +42,9 @@ def get_datasets(stock_name,data_columns,append_intraday=False):
         return datasets
 
     elif (stock_name== "SinTest"):
-        datasets = []
-
-        return datasets
+        return [pd.DataFrame(np.sin(4.*np.linspace(-10,10,1000))+2.,columns=['Close'])]
+    elif (stock_name== "ArangeTest"):
+        return [pd.DataFrame(np.arange(0,1000),columns=['Close'])]
 
     else:
         return [get_single_dataset(stock_name,data_columns,append_intraday)]
@@ -100,6 +100,7 @@ def get_single_dataset(stock_name,data_columns,append_intraday=False):
             append_values[0] = np.mean(dataset_tmp.values[-60:],axis=0)[0]
             data_tmp = pd.DataFrame([append_values],index=[today],columns = data_columns)
             dataset = pd.concat([dataset,data_tmp])
+
     return dataset
 
 def filter_data(data_series,window_size=5,order=3):

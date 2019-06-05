@@ -20,7 +20,7 @@ stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
 
 stock_names = ["SunOpta"]
-model_names = ["SunOpta_2_20_5y_filter-5","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
+model_names = ["SunOpta_2","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
 
 #model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)
@@ -37,7 +37,8 @@ for num in range(len(stock_names)):
 
 
         normalize = True
-        window_size = 61
+        n_outputs = 2
+        window_size = 60 + n_outputs
         #data_columns = ['4. close']
         interval_min = 0
         interval_max = None
@@ -56,7 +57,7 @@ for num in range(len(stock_names)):
         print(datasets[0].tail())
 
         filter_window_size = 21
-        filter_order = 5
+        filter_order = 3
 
         data_original = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
         # data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
@@ -73,8 +74,8 @@ for num in range(len(stock_names)):
         model = Model(model_name)
         model.load()
 
-        x_ori, y_ori = model.window_data(data_original, window_size, False)
-        x_test, y_test = model.window_data(data_test, window_size, False)
+        x_ori, y_ori,_ = model.window_data(data_original, window_size, False,n_outputs)
+        x_test, y_test,_ = model.window_data(data_test, window_size, False,n_outputs)
 
         filtered_stock_price = np.concatenate(y_test)
         real_stock_price = np.concatenate(y_ori)
@@ -100,7 +101,7 @@ for num in range(len(stock_names)):
         for p in range(2):
             pos = p
             prediction_length = 7
-            predicted_stock_price = model.predict_sequence(x_test[-pos - 1], window_size, normalize, prediction_length)
+            predicted_stock_price = model.predict_sequence(x_test[-pos - 1], window_size, normalize, prediction_length,n_outputs)
             predicted_stock_price.insert(0, y_ori[-pos - 1][0])
             prediction_dates = [data_dates[-pos - 1]]
             for j in range(1, prediction_length + 1):
@@ -129,7 +130,7 @@ for num in range(len(stock_names)):
             #predict test by looking at last window_size entries of dataset_total
             data_initial = x_test[-pos - 1]
 
-            predicted_stock_price = model.predict_sequence(data_initial, window_size,normalize, prediction_length)
+            predicted_stock_price = model.predict_sequence(data_initial, window_size,normalize, prediction_length,n_outputs)
             predicted_stock_price.insert(0, y_ori[-pos - 1][0])
 
             #predicted_stock_price = sc.inverse_transform(np.reshape(predicted_stock_price,(-1,1)))
@@ -158,7 +159,7 @@ for num in range(len(stock_names)):
         props = dict(boxstyle='round,pad=1', facecolor=color_palette["blue"],edgecolor=color_palette["blue"], alpha=0.5)
 
         if evaluate_performance:
-            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates, x_test, y_ori, 100, window_size, normalize, 7)
+            prediction_sign_rates, prediction_mean, prediction_error = model.evaluate_prediction(data_dates, x_test, y_ori, 100, window_size, normalize, 7,n_outputs)
             print("prediction sign rate ",prediction_sign_rates)
             print("prediction mean ",prediction_mean)
             print("prediction errors ", prediction_error)
