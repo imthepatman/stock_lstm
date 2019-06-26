@@ -2,7 +2,9 @@ import json
 import sys
 import pandas as pd
 from data_ops import *
-from model import *
+from model_fairseq import *
+import math
+
 
 if(len(sys.argv)==5) :
 
@@ -10,27 +12,27 @@ if(len(sys.argv)==5) :
     model_name = sys.argv[2]
     epochs = int(sys.argv[3])
     resume = sys.argv[4]
-    n_outputs = 2
-    window_size = 60 + n_outputs
-    interval_min = -5*365
+    n_outputs = 1
+    window_size = 5 + n_outputs
+    interval_min = -1*365
     interval_max = -100
     normalize = True
 
-    batch_size = 64
+    batch_size = 1
     shuffle = True
 
     test_model = True
 
 
     abs_dir = os.path.dirname(os.path.realpath(__file__))
-    config = json.load(open(abs_dir+'/model_config.json', 'r'))
+    config = json.load(open(abs_dir+'/model_config_fairseq.json', 'r'))
 
     model = Model(model_name)
 
     if (resume == "y"):
-        model.load()
+        model.build(config,load=True)
     elif (resume == "n"):
-        model.build(config)
+        model.build(config,load=False)
     else:
         print("resume has to be y/n")
         quit()
@@ -41,7 +43,7 @@ if(len(sys.argv)==5) :
     print(datasets[0].tail())
 
     filter_window_size = 21
-    filter_order = 3
+    filter_order = 5
 
     data_original = [pd.DataFrame(ds).values for ds in datasets]
     data_train  = [filter_data(d[interval_min:interval_max],filter_window_size,filter_order) for d in data_original]

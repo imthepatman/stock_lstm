@@ -1,121 +1,145 @@
 # Importing the Keras libraries and packages
 
 import numpy as np
-from numpy import newaxis
-from keras.layers import Dense, Activation, Dropout, LSTM,GRU
-from keras.models import Sequential, load_model
-from keras.callbacks import EarlyStopping, ModelCheckpoint,LearningRateScheduler
-from keras import optimizers
-import keras
-import keras.backend as K
+import tensorflow as tf
 import os
-import math
 import time
+
+def encoder_block(inp, n_hidden, filter_size):
+    inp = tf.expand_dims(inp, 2)
+    inp = tf.pad(inp, [[0, 0], [(filter_size[0] - 1) // 2, (filter_size[0] - 1) // 2], [0, 0], [0, 0]])
+    conv = tf.layers.conv2d(inp, n_hidden, filter_size, padding="VALID", activation=None)
+    conv = tf.squeeze(conv, 2)
+    return conv
+
+
+def decoder_block(inp, n_hidden, filter_size):
+    inp = tf.expand_dims(inp, 2)
+    inp = tf.pad(inp, [[0, 0], [filter_size[0] - 1, 0], [0, 0], [0, 0]])
+    conv = tf.layers.conv2d(inp, n_hidden, filter_size, padding="VALID", activation=None)
+    conv = tf.squeeze(conv, 2)
+    return conv
+
+
+def glu(x):
+    return tf.multiply(x[:, :, :tf.shape(x)[2] // 2], tf.sigmoid(x[:, :, tf.shape(x)[2] // 2:]))
+
+
+def layer(inp, conv_block, kernel_width, n_hidden, residual=None):
+    z = conv_block(inp, n_hidden, (kernel_width, 1))
+    return glu(z) + (residual if residual is not None else 0)
 
 
 class Model:
-    """A class for building and inferencing an lstm model"""
     def __init__(self,name):
         self.name = name
         self.abs_dir = os.path.dirname(os.path.realpath(__file__))
 
 
-    def build(self, configs):
-        self.model = Sequential()
+    def build(self, configs,load=False):
+        self.config = configs
+        self.X = tf.placeholder(tf.float32, (None, None,self.config['model']['input_size']))
+        self.Y = tf.placeholder(tf.float32, (None, self.config['model']['output_size']))
 
-        for layer in configs['model']['layers']:
-            neurons = layer['neurons'] if 'neurons' in layer else None
-            dropout_rate = layer['dropout_rate'] if 'dropout_rate' in layer else None
-            recurrent_dropout = layer['recurrent_dropout'] if 'recurrent_dropout' in layer else None
-            activation = layer['activation'] if 'activation' in layer else None
-            return_seq = layer['return_seq'] if 'return_seq' in layer else None
-            input_timesteps = layer['input_timesteps'] if 'input_timesteps' in layer else None
-            input_dim = layer['input_dim'] if 'input_dim' in layer else None
+        encoder_embedded = tf.layers.dense(self.X, self.config['model']['emb_size'])
+        encoder_embedded = tf.nn.dropout(encoder_embedded, keep_prob=0.75)
 
-            if layer['type'] == 'dense':
-                self.model.add(Dense(neurons, activation=activation))
-            if layer['type'] == 'lstm':
-                self.model.add(LSTM(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,dropout=dropout_rate,recurrent_dropout=recurrent_dropout))
-            if layer['type'] == 'gru':
-                self.model.add(GRU(neurons, input_shape=(input_timesteps, input_dim), return_sequences=return_seq,dropout=dropout_rate,recurrent_dropout=recurrent_dropout))
-            if layer['type'] == 'dropout':
-                self.model.add(Dropout(rate = dropout_rate))
+        e = tf.identity(encoder_embedded)
+        for i in range(self.config['model']['n_layers']):
+            z = layer(encoder_embedded, encoder_block, 3, self.config['model']['n_hidden'] * 2, encoder_embedded)
+            encoder_embedded = z
 
-        if configs['model']['optimizer']=='adam':
-            optimizer = optimizers.Adam()
-        elif configs['model']['optimizer']=='nadam':
-            optimizer = optimizers.Nadam()
-        elif configs['model']['optimizer'] == 'nesterov':
-            optimizer = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-        elif configs['model']['optimizer'] == 'rmsprop':
-            optimizer = optimizers.RMSprop(lr=0.01, rho=0.9, epsilon=None, decay=0.0)
+        encoder_output, output_memory = z, z + e
+        g = tf.identity(encoder_embedded)
+
+        for i in range(self.config['model']['n_layers']):
+            attn_res = h = layer(encoder_embedded, decoder_block, 3, self.config['model']['n_hidden'] * 2,
+                                 residual=tf.zeros_like(encoder_embedded))
+            C = []
+            for j in range(self.config['model']['n_attn_heads']):
+                h_ = tf.layers.dense(h, self.config['model']['n_hidden'] // self.config['model']['n_attn_heads'])
+                g_ = tf.layers.dense(g, self.config['model']['n_hidden'] // self.config['model']['n_attn_heads'])
+                zu_ = tf.layers.dense(encoder_output, self.config['model']['n_hidden'] // self.config['model']['n_attn_heads'])
+                ze_ = tf.layers.dense(output_memory, self.config['model']['n_hidden'] // self.config['model']['n_attn_heads'])
+
+                d = tf.layers.dense(h_, self.config['model']['n_hidden'] // self.config['model']['n_attn_heads']) + g_
+                dz = tf.matmul(d, tf.transpose(zu_, [0, 2, 1]))
+                a = tf.nn.softmax(dz)
+                c_ = tf.matmul(a, ze_)
+                C.append(c_)
+
+            c = tf.concat(C, 2)
+            h = tf.layers.dense(attn_res + c, self.config['model']['n_hidden'])
+            encoder_embedded = h
+
+        encoder_embedded = tf.sigmoid(h)
+        self.logits = tf.layers.dense(encoder_embedded[-1], self.config['model']['output_size'])
+        self.cost = tf.reduce_mean(tf.square(self.Y - self.logits))
+        self.optimizer = tf.train.AdamOptimizer(self.config['model']['learning_rate']).minimize(
+            self.cost
+        )
+
+        self.sess = tf.InteractiveSession()
+        if load:
+            self.load()
         else:
-            optimizer = configs['model']['optimizer']
+            self.sess.run(tf.global_variables_initializer())
 
-        #self.model.compile(loss=configs['model']['loss'], optimizer=optimizer)
-        self.model.compile(loss=configs['model']['loss'], optimizer=optimizer)
-
-        print('[Model] Model Compiled')
-
-
-
-    '''***************************************TRAINING*****************************************************'''
     def train_generator(self, x_train, y_train, epochs, batch_size, steps_per_epoch, shuffle=True, early_stopping_patience=1000, x_val=None, y_val=None):
 
-        training_batch_generator = BatchGenerator(x_train,y_train,batch_size,shuffle)
+        training_batch_generator = BatchGenerator(x_train, y_train, batch_size, shuffle)
 
-        early_stopping_callback = EarlyStopping(monitor='loss', patience=early_stopping_patience)
-
-        loss_weight = 0.99
+        x_init,y_init = training_batch_generator.getitem(0)
+        out_logits,out_cost = self.sess.run([self.logits,self.cost],
+                                   feed_dict={
+                                       self.X: x_init,
+                                       self.Y: y_init
+                                   },
+                                   )
+        print(np.shape(x_init),out_cost)
 
         print('[Model] Training Started')
         print('[Model] %s epochs, %s batch size, %s batches per epoch' % (epochs, batch_size, steps_per_epoch))
         time_start = time.time()
-        if((x_val != None).all() and (y_val!= None).all()):
-            validation_batch_generator = BatchGenerator(x_val, y_val, 10, shuffle)
 
-            checkpoint = ModelCheckpoint(self.abs_dir + "/models/rnn_" + self.name + "_cp", monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-            callbacks_list = [checkpoint, early_stopping_callback]
-
-            self.model.fit_generator(
-                training_batch_generator,
-                validation_data=validation_batch_generator,
-                steps_per_epoch=steps_per_epoch,
-                epochs=epochs,
-                workers=1,
-                callbacks=callbacks_list
-                #class_weight={0:loss_weight,1:1.-loss_weight}
-            )
-        else:
-            checkpoint = ModelCheckpoint(self.abs_dir + "/models/rnn_" + self.name + "_cp", monitor='loss', verbose=1, save_best_only=True, mode='min')
-            callbacks_list = [checkpoint, early_stopping_callback]
-
-            self.model.fit_generator(
-                training_batch_generator,
-                steps_per_epoch=steps_per_epoch,
-                epochs=epochs,
-                workers=1,
-                callbacks=callbacks_list
-                #class_weight={0: loss_weight, 1: 1. - loss_weight}
-            )
+        print_skip = 10
+        for i in range(epochs):
+            total_loss = 0
+            for k in range(0, training_batch_generator.len()):
+                batch_x, batch_y = training_batch_generator.getitem(k)
+                #shape_x = np.shape(batch_x)
+                #batch_x = np.reshape(batch_x,(shape_x[0],shape_x[1]*shape_x[2]))
+                _, loss = self.sess.run(
+                    [self.optimizer, self.cost],
+                    feed_dict={
+                        self.X: batch_x,
+                        self.Y: batch_y
+                    },
+                )
+                total_loss += loss
+                print("[Model] Epoch: " +str(i + 1)+" Trainingsample: "+str(k) +"/"+str(training_batch_generator.len()) + " loss: "+'{0:.6f}'.format(total_loss/(k+1))+"\t", end="\r")
+            if (i + 1) % print_skip == 0:
+                print('[Model] Epoch:', i + 1, 'Average loss: '+'{0:.6f}'.format(total_loss/training_batch_generator.len()) )
+            training_batch_generator.on_epoch_end()
 
         print('[Model] Training completed in ' + '{0:.1f}'.format(time.time()-time_start) + "s")
 
-    def step_decay_lr(self,epoch,current_lr):
-        initial_lr = 0.1
-        drop = 0.1
-        epochs_drop = 2
-        lr = initial_lr * math.pow(drop, math.floor((1 + epoch) / epochs_drop))
-        print("[Model] Learning rate set to "+str(lr))
-        return lr
 
     '''***************************************PREDICTION*****************************************************'''
+    def predict(self,x_init):
+        out_logits = self.sess.run(self.logits,
+                              feed_dict={
+                                  self.X: x_init
+                              },
+                              )
+        return out_logits
+
     def predict_point_by_point(self, data, window_size, normalize,n_outputs):
-        # Predict each timestep given the last sequence of true data, in effect only predicting 1 step ahead each time
+                # Predict each timestep given the last sequence of true data, in effect only predicting 1 step ahead each time
         x_data,_,_ = self.window_data(data, window_size, False,n_outputs)
         x_norm,_,_  = self.window_data(data, window_size, True,n_outputs)
         print('[Model] Predicting Point-by-Point...')
-        predicted = self.inverse_transform_prediction(x_data,[self.model.predict(x_norm)[0,0]])
+        predicted = self.inverse_transform_prediction(x_data,[self.predict(x_norm)[0,0]])
         #predicted = np.reshape(predicted, (predicted.size,))
         return predicted
 
@@ -126,12 +150,12 @@ class Model:
         for i in range(prediction_len):
             #print("frame ",i,curr_frame)
             curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
-            predicted = self.model.predict(curr_frame_norm)[0,0]
+            predicted = self.predict(curr_frame_norm)[0,0]
             prediction.append(self.inverse_transform_prediction([curr_frame], [predicted])[0])
 
-            curr_frame = curr_frame[1:]
             curr_tmp = np.array(curr_frame[-1])
             curr_tmp[0] = prediction[-1]
+            curr_frame = curr_frame[1:]
             #print(curr_tmp)
             curr_frame = np.insert(curr_frame, window_size - n_outputs-1, curr_tmp, axis=0)
         return prediction
@@ -142,15 +166,15 @@ class Model:
         print('[Model] Predicting Sequences Multiple...')
         prediction_seqs = []
         for i in range(int(np.shape(data)[1] / prediction_len)-1):
-            curr_frame = x_data[i * prediction_len]
+            curr_frame = np.array(x_data[i * prediction_len])
+
             prediction = []
             for j in range(prediction_len):
                 #print(curr_frame)
                 curr_frame_norm = self.relative_normalize_window(curr_frame, normalize)
                 #print(curr_frame_norm)
-                predicted = self.model.predict(curr_frame_norm)[0,0]
+                predicted = self.predict(curr_frame_norm)[0,0]
                 prediction.append(self.inverse_transform_prediction([curr_frame],[predicted])[0])
-                curr_frame = curr_frame[1:]
                 curr_tmp = np.array(curr_frame[-1])
                 curr_tmp[0] = prediction[-1]
                 curr_frame = np.insert(curr_frame, window_size - n_outputs - 1, curr_tmp, axis=0)
@@ -289,14 +313,17 @@ class Model:
     '''***************************************SAVE / LOAD*****************************************************'''
 
     def save(self):
-        self.model.save(self.abs_dir+"/models/rnn_" + self.name)
+        saver = tf.train.Saver()
+        saver.save(self.sess, self.abs_dir+"/models/tf_" + self.name)
         print("[Model] " + self.name + " saved")
 
     def load(self):
-        self.model = load_model(self.abs_dir+"/models/rnn_" + self.name)
+        saver = tf.train.Saver()
+        saver.restore(self.sess, self.abs_dir + "/models/tf_" + self.name)
         print("[Model] " + self.name + " loaded")
 
-class BatchGenerator(keras.utils.Sequence):
+
+class BatchGenerator():
     'Generates data for Keras'
     def __init__(self, data_x,data_y,batch_size,shuffle):
         'Initialization'
@@ -308,12 +335,12 @@ class BatchGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         self.on_epoch_end()
 
-    def __len__(self):
+    def len(self):
         'Denotes the number of batches per epoch'
         num_batches = int(np.floor(self.data_len / self.batch_size))
         return num_batches
 
-    def __getitem__(self, index):
+    def getitem(self, index):
         'Generate one batch of data'
 
         x_batch = []

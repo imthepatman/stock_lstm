@@ -1,7 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
 import pandas as pd
-from model import *
+from model_fairseq import *
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pandas.plotting import register_matplotlib_converters
@@ -19,8 +19,8 @@ stock_names=["Infineon","Aixtron","Gaia","SunOpta","Bitcoin"]#
 #model_names =["portfolio_2_256-256_10y"]# ["portfolio_2_256-256_10y"]*3 +
 #model_names = ["portfolio_2_256-256_5y"]*4 + ["Bitcoin_2_256-256_5y"]
 
-stock_names = ["SunOpta"]
-model_names = ["SunOpta_2","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
+stock_names = ["Infineon"]
+model_names = ["Infineon","Aixtron_1_10_5y_filter-3","Gaia_1_10_5y_filter-3","SunOpta_1_10_5y_filter-3","Bitcoin_1_10_5y_filter-3"]
 
 #model_names = ["Aixtron_1_256-256_5y","Gaia_1_256-256_5y","SunOpta_1_256-256_5y"]
 view_lengths = [60]*len(stock_names)
@@ -37,8 +37,8 @@ for num in range(len(stock_names)):
 
 
         normalize = True
-        n_outputs = 2
-        window_size = 60 + n_outputs
+        n_outputs = 1
+        window_size = 5 + n_outputs
         #data_columns = ['4. close']
         interval_min = 0
         interval_max = None
@@ -48,7 +48,7 @@ for num in range(len(stock_names)):
         color_palette = {"blue":"#1f77b4","wine_red":"#794044","green":"#2ca02c"}
 
         abs_dir = os.path.dirname(os.path.realpath(__file__))
-        config = json.load(open(abs_dir + '/model_config.json', 'r'))
+        config = json.load(open(abs_dir + '/model_config_fairseq.json', 'r'))
         data_columns = config["data_columns"]
         # data_columns = ["Close","Open","High","Low","Volume"]
         # data_columns = ["Close","Open","Volume"]
@@ -57,7 +57,7 @@ for num in range(len(stock_names)):
         print(datasets[0].tail())
 
         filter_window_size = 21
-        filter_order = 3
+        filter_order = 5
 
         data_original = [pd.DataFrame(ds).values[interval_min:interval_max] for ds in datasets]
         # data_original = [np.reshape(np.sin(4*np.linspace(-10,10,1000))+2,(-1,1))]
@@ -72,7 +72,7 @@ for num in range(len(stock_names)):
 
 
         model = Model(model_name)
-        model.load()
+        model.build(config,load=True)
 
         x_ori, y_ori,_ = model.window_data(data_original, window_size, False,n_outputs)
         x_test, y_test,_ = model.window_data(data_test, window_size, False,n_outputs)
